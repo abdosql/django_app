@@ -1,8 +1,27 @@
 from rest_framework import serializers
-from .models import Operator
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from .models import Operator, User
+
+class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'password', 'first_name', 'last_name', 
+                 'is_operator', 'is_staff']
+        read_only_fields = ['is_staff']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
 
 class OperatorSerializer(serializers.ModelSerializer):
-    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    email = serializers.EmailField(source='user.email', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', 
+                                          read_only=True)
     
     class Meta:
         model = Operator
@@ -19,4 +38,16 @@ class OperatorSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "notification_preferences must contain email_enabled and telegram_enabled"
             )
-        return value 
+        return value
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data['user_id'] = self.user.id
+        data['email'] = self.user.email
+        data['is_staff'] = self.user.is_staff
+        if self.user.is_operator:
+            operator = Operator.objects.get(user=self.user)
+            data['operator_id'] = operator.id
+            data['operator_priority'] = operator.priority
+        return data 

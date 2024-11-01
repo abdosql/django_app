@@ -1,4 +1,30 @@
 from django.db import models
+from django.contrib.auth.models import AbstractUser, BaseUserManager
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Email is required')
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, password, **extra_fields)
+
+class User(AbstractUser):
+    username = None
+    email = models.EmailField(unique=True)
+    is_operator = models.BooleanField(default=False)
+    
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
+    
+    objects = CustomUserManager()
 
 class Operator(models.Model):
     PRIORITY_CHOICES = [
@@ -7,8 +33,8 @@ class Operator(models.Model):
         (3, 'Tertiary')
     ]
 
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
-    email = models.EmailField()
     telegram_id = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     priority = models.IntegerField(choices=PRIORITY_CHOICES, default=1)
@@ -24,8 +50,8 @@ class Operator(models.Model):
 
     def get_notification_channels(self):
         channels = []
-        if self.email and self.notification_preferences.get('email_enabled', True):
+        if self.user.email and self.notification_preferences.get('email_enabled', True):
             channels.append('email')
         if self.telegram_id and self.notification_preferences.get('telegram_enabled', True):
             channels.append('telegram')
-        return channels 
+        return channels
