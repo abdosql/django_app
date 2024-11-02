@@ -16,6 +16,9 @@ RUN npm install && \
 # Copy project files
 COPY frontend/ .
 
+# Create production env file
+RUN echo "VITE_API_URL=/api" > .env
+
 # Build the project with explicit platform
 ENV NODE_ENV=production
 RUN npm run build

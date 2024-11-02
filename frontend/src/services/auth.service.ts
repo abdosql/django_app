@@ -14,22 +14,29 @@ interface LoginCredentials {
 }
 
 class AuthService {
-  private baseUrl = `${import.meta.env.VITE_API_URL}`;
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_API_URL || '/api';
+    console.log('API URL:', this.baseUrl);
+  }
 
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
+      console.log('Attempting login to:', `${this.baseUrl}/token/`);
       const response = await fetch(`${this.baseUrl}/token/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        credentials: 'include',
+        credentials: 'same-origin',
         body: JSON.stringify(credentials),
       });
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Login error:', error);
         throw new Error(error.detail || `HTTP error! status: ${response.status}`);
       }
 
@@ -37,6 +44,7 @@ class AuthService {
       this.setTokens(data.access, data.refresh);
       return data;
     } catch (error) {
+      console.error('Login error:', error);
       if (error instanceof Error) {
         throw error;
       }
