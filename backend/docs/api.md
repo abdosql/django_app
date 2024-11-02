@@ -6,7 +6,7 @@
 ## Authentication
 
 ### Token Generation
-- **Endpoint**: `/api/token/`
+- **Endpoint**: `/api/auth/token/`
 - **Method**: `POST`
 - **Description**: Obtain JWT token pair for authentication
 - **Request Body**:
@@ -30,7 +30,7 @@
 ```
 
 ### Token Refresh
-- **Endpoint**: `/api/token/refresh/`
+- **Endpoint**: `/api/auth/token/refresh/`
 - **Method**: `POST`
 - **Description**: Refresh JWT access token
 - **Request Body**:
@@ -106,7 +106,7 @@
 
 ### Users
 #### List/Create Users
-- **Endpoint**: `/api/users/`
+- **Endpoint**: `/api/auth/users/`
 - **Methods**: `GET`, `POST`
 - **Authentication**: Admin only
 - **POST Request Body**:
@@ -121,7 +121,7 @@
 ```
 
 #### User Detail
-- **Endpoint**: `/api/users/{id}/`
+- **Endpoint**: `/api/auth/users/{id}/`
 - **Methods**: `GET`, `PUT`, `PATCH`, `DELETE`
 - **Authentication**: Admin only
 

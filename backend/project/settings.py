@@ -40,9 +40,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'rest_framework',
     'rest_framework_simplejwt',
-    'myapi',
-    'monitoring',
+    'authentication',
     'notifications',
+    'monitoring',
+    'myapi',
 ]
 
 MIDDLEWARE = [
@@ -103,7 +104,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # Add to your existing settings
-AUTH_USER_MODEL = 'notifications.User'
+AUTH_USER_MODEL = 'authentication.User'
 
 # Add REST Framework settings
 REST_FRAMEWORK = {
