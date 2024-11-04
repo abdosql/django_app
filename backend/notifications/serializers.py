@@ -5,18 +5,36 @@ from .models import Operator
 User = get_user_model()
 
 class OperatorSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(source='user.email', read_only=True)
-    priority_display = serializers.CharField(source='get_priority_display', 
-                                          read_only=True)
+    email = serializers.EmailField(write_only=True)
+    password = serializers.CharField(write_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    priority_display = serializers.CharField(source='get_priority_display', read_only=True)
     
     class Meta:
         model = Operator
         fields = [
-            'id', 'name', 'email', 'telegram_id', 'is_active',
-            'priority', 'priority_display', 'notification_preferences',
-            'created_at', 'updated_at'
+            'id', 'name', 'user_email', 'email', 'password', 'telegram_id', 
+            'is_active', 'priority', 'priority_display', 
+            'notification_preferences', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        email = validated_data.pop('email')
+        password = validated_data.pop('password')
+        
+        user = User.objects.create_user(
+            email=email,
+            password=password,
+            is_operator=True
+        )
+        
+        operator = Operator.objects.create(
+            user=user,
+            **validated_data
+        )
+        
+        return operator
 
     def validate_notification_preferences(self, value):
         required_keys = {'email_enabled', 'telegram_enabled'}

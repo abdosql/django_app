@@ -1,10 +1,11 @@
 import { authService } from './auth.service';
+import config from '../config';
 
 class UserService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = '/api';
+    this.baseUrl = config.apiUrl;
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {

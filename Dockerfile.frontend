@@ -1,42 +1,18 @@
-# Build stage
-FROM node:18-alpine as build
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Install required build dependencies
-RUN apk add --no-cache python3 make g++
-
-# Copy package files first to leverage Docker cache
+# Copy package files
 COPY frontend/package*.json ./
 
-# Install dependencies with clean npm cache
-RUN npm install && \
-    npm cache clean --force
+# Install dependencies
+RUN npm install
 
-# Copy project files
-COPY frontend/ .
+# We don't copy the source code here because we'll use volumes in development
+# The source code will be mounted at runtime
 
-# Create production env file
-RUN echo "VITE_API_URL=/api" > .env
-
-# Build the project with explicit platform
-ENV NODE_ENV=production
-RUN npm run build
-
-# Serve stage
-FROM nginx:alpine
-
-# Copy built assets from builder
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Add nginx config
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=3s \
-    CMD wget --quiet --tries=1 --spider http://localhost:3000 || exit 1
-
+# Expose development server port
 EXPOSE 3000
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start development server
+CMD ["npm", "run", "dev"]

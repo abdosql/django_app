@@ -24,10 +24,37 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const response = await fetch('/api/auth/token/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': window.location.origin,
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Invalid credentials');
+      }
+
+      // Store tokens and user_id
+      sessionStorage.setItem('access_token', data.access);
+      sessionStorage.setItem('refresh_token', data.refresh);
+      sessionStorage.setItem('user_id', data.user_id.toString());
+      
+      // Call login with email and password as expected by AuthContext
+      await login(email.trim(), password);
+      
       const from = (location.state as any)?.from?.pathname || '/';
       navigate(from, { replace: true });
     } catch (err) {
+      console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Failed to login');
     } finally {
       setIsLoading(false);

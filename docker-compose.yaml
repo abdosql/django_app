@@ -42,7 +42,9 @@ services:
       - "3000:3000"
     environment:
       - VITE_API_URL=http://backend:8000/api
-      - CHOKIDAR_USEPOLLING=true  # Enable polling for file changes
+      - CHOKIDAR_USEPOLLING=true
+      - NODE_ENV=development
+      - VITE_NODE_ENV=development
     volumes:
       - ./frontend:/app
       - /app/node_modules

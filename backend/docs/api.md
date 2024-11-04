@@ -137,7 +137,7 @@
 {
     "name": "John Doe",
     "email": "john@example.com",
-    "phone": "+1234567890",
+    "password": "secure_password",
     "telegram_id": "telegram123",
     "is_active": true,
     "priority": 1,
