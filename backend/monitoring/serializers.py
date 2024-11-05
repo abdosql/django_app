@@ -1,10 +1,27 @@
 from rest_framework import serializers
-from .models import Reading, Alert, SystemSettings
+from .models import Reading, Alert
 
 class ReadingSerializer(serializers.ModelSerializer):
+    battery_level = serializers.FloatField(
+        min_value=0,
+        max_value=100,
+        help_text="Battery level percentage (0-100)"
+    )
+    
     class Meta:
         model = Reading
-        fields = '__all__'
+        fields = [
+            'id', 'temperature', 'humidity', 
+            'power_status', 'battery_level', 'timestamp'
+        ]
+
+    def validate_battery_level(self, value):
+        """Ensure battery level is a valid percentage"""
+        if not 0 <= value <= 100:
+            raise serializers.ValidationError(
+                "Battery level must be between 0 and 100"
+            )
+        return value
 
 class AlertSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source='get_type_display', read_only=True)
@@ -13,31 +30,3 @@ class AlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Alert
         fields = '__all__'
-
-class SystemSettingsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SystemSettings
-        fields = [
-            'normal_temp_min', 'normal_temp_max',
-            'critical_temp_min', 'critical_temp_max',
-            'reading_interval', 'alert_reset_time',
-            'require_2fa', 'updated_at'
-        ]
-
-    def validate(self, data):
-        """
-        Check that temperature ranges are valid
-        """
-        if 'normal_temp_min' in data and 'normal_temp_max' in data:
-            if data['normal_temp_min'] >= data['normal_temp_max']:
-                raise serializers.ValidationError(
-                    "Normal minimum temperature must be less than maximum"
-                )
-
-        if 'critical_temp_min' in data and 'critical_temp_max' in data:
-            if data['critical_temp_min'] >= data['critical_temp_max']:
-                raise serializers.ValidationError(
-                    "Critical minimum temperature must be less than maximum"
-                )
-
-        return data 

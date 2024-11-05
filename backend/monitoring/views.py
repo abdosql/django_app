@@ -4,9 +4,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.utils import timezone
 from datetime import timedelta
-from .models import Reading, Alert, SystemSettings
-from .serializers import ReadingSerializer, AlertSerializer, SystemSettingsSerializer
+from .models import Reading, Alert
+from .serializers import ReadingSerializer, AlertSerializer
 from notifications.services.notification_service import NotificationService
+from settings.models import SystemSettings
 
 class ReadingViewSet(viewsets.ModelViewSet):
     queryset = Reading.objects.all()
@@ -89,26 +90,3 @@ class AlertViewSet(viewsets.ReadOnlyModelViewSet):
         alert.resolved_at = timezone.now()
         alert.save()
         return Response({'status': 'alert resolved'})
-
-class SystemSettingsViewSet(viewsets.ModelViewSet):
-    queryset = SystemSettings.objects.all()
-    serializer_class = SystemSettingsSerializer
-    permission_classes = [IsAdminUser]
-
-    def get_object(self):
-        """Always return the single settings instance"""
-        return SystemSettings.get_settings()
-
-    def list(self, request, *args, **kwargs):
-        """Override list to return single settings instance"""
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
-
-    def create(self, request, *args, **kwargs):
-        """Override create to update existing settings"""
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data) 

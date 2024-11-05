@@ -21,4 +21,4 @@ RUN echo "VITE_API_URL=/api" > .env
 
 # Development mode for hot reloading
 ENV NODE_ENV=development
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"] 
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

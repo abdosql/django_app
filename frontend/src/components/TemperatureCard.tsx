@@ -1,15 +1,20 @@
 import React from 'react';
 import CountUp from 'react-countup';
 import { Thermometer, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { useSystemSettings } from '../hooks/useSystemSettings';
 
 interface TemperatureCardProps {
   current: number;
   max: number;
   min: number;
   trend: 'up' | 'down' | 'stable';
+  isLoading: boolean;
+  error: string | null;
 }
 
-export default function TemperatureCard({ current, max, min, trend }: TemperatureCardProps) {
+export default function TemperatureCard({ current, max, min, trend, isLoading, error }: TemperatureCardProps) {
+  const { settings, isLoading: settingsLoading } = useSystemSettings();
+
   const getTrendColor = () => {
     if (trend === 'up') return 'text-red-500';
     if (trend === 'down') return 'text-blue-500';
@@ -23,8 +28,12 @@ export default function TemperatureCard({ current, max, min, trend }: Temperatur
   };
 
   const getAlertStatus = () => {
-    if (current < 0 || current > 10) return 'severe';
-    if (current < 2 || current > 8) return 'critical';
+    if (current < settings.critical_temp_min || current > settings.critical_temp_max) {
+      return 'severe';
+    }
+    if (current < settings.normal_temp_min || current > settings.normal_temp_max) {
+      return 'critical';
+    }
     return 'normal';
   };
 
@@ -34,6 +43,30 @@ export default function TemperatureCard({ current, max, min, trend }: Temperatur
     if (status === 'critical') return 'text-orange-600 bg-orange-50';
     return 'text-green-600 bg-green-50';
   };
+
+  if (isLoading || settingsLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+          <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="text-red-500">
+          <AlertTriangle className="h-6 w-6 mb-2" />
+          <p>Error loading temperature data</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6 transition-all duration-300 hover:shadow-md">
@@ -66,6 +99,21 @@ export default function TemperatureCard({ current, max, min, trend }: Temperatur
         <div className="flex items-center">
           <TrendingDown className="h-4 w-4 text-blue-500 mr-1" />
           <span>{min}°C Min</span>
+        </div>
+      </div>
+
+      {/* Temperature Ranges Legend */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="text-green-600">
+            Normal: {settings.normal_temp_min}°C - {settings.normal_temp_max}°C
+          </div>
+          <div className="text-orange-600">
+            Critical: {settings.critical_temp_min}°C - {settings.critical_temp_max}°C
+          </div>
+          <div className="text-red-600">
+            Severe: &lt;{settings.critical_temp_min}°C, &gt;{settings.critical_temp_max}°C
+          </div>
         </div>
       </div>
     </div>

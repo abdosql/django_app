@@ -43,16 +43,50 @@ export default function LoginPage() {
         throw new Error(data.detail || 'Invalid credentials');
       }
 
-      // Store tokens and user_id
+      // Store tokens and user data
       sessionStorage.setItem('access_token', data.access);
       sessionStorage.setItem('refresh_token', data.refresh);
       sessionStorage.setItem('user_id', data.user_id.toString());
+      
+      // Store complete user data including first_name and last_name
+      const userData = {
+        id: data.user_id,
+        email: data.email,
+        isStaff: data.is_staff,
+        operatorId: data.operator_id,
+        operatorPriority: data.operator_priority,
+        first_name: data.first_name || '',
+        last_name: data.last_name || ''
+      };
+      sessionStorage.setItem('user_data', JSON.stringify(userData));
       
       // Call login with email and password as expected by AuthContext
       await login(email.trim(), password);
       
       const from = (location.state as any)?.from?.pathname || '/';
       navigate(from, { replace: true });
+
+      // Fetch full user profile
+      const profileResponse = await fetch(`/api/auth/users/${data.user_id}/`, {
+        headers: {
+          'Authorization': `Bearer ${data.access}`,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        const userData = {
+          id: data.user_id,
+          email: data.email,
+          isStaff: data.is_staff,
+          operatorId: data.operator_id,
+          operatorPriority: data.operator_priority,
+          first_name: profileData.first_name || '',
+          last_name: profileData.last_name || ''
+        };
+        sessionStorage.setItem('user_data', JSON.stringify(userData));
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'Failed to login');

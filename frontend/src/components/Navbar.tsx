@@ -60,6 +60,18 @@ export default function Navbar() {
     };
   }, []);
 
+  const getUserDisplayName = () => {
+    // Get user data from session storage
+    const userData = sessionStorage.getItem('user_data');
+    if (userData) {
+      const parsedData = JSON.parse(userData);
+      const firstName = parsedData.first_name || '';
+      const lastName = parsedData.last_name || '';
+      return `${firstName} ${lastName}`.trim() || parsedData.email.split('@')[0];
+    }
+    return 'User';
+  };
+
   return (
     <nav className="bg-white border-b border-gray-200 fixed w-full top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -103,7 +115,9 @@ export default function Navbar() {
                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
                   <User className="h-5 w-5 text-indigo-600" />
                 </div>
-                <span className="hidden md:block text-sm font-medium text-gray-700">John Doe</span>
+                <span className="hidden md:block text-sm font-medium text-gray-700">
+                  {getUserDisplayName()}
+                </span>
               </button>
 
               <ProfileDropdown 

@@ -3,19 +3,38 @@ import TemperatureCard from '../components/TemperatureCard';
 import TemperatureGraph from '../components/TemperatureGraph';
 import SystemStatus from '../components/SystemStatus';
 import AlertsPanel from '../components/AlertsPanel';
+import { useTemperatureReadings } from '../hooks/useTemperatureReadings';
 
 export default function Dashboard() {
+  const {
+    currentTemperature,
+    maxTemperature,
+    minTemperature,
+    trend,
+    isLoading,
+    error,
+    humidity,
+    powerStatus,
+    batteryLevel
+  } = useTemperatureReadings();
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <TemperatureCard
-          current={5.5}
-          max={6.2}
-          min={4.8}
-          trend="up"
+          current={currentTemperature}
+          max={maxTemperature}
+          min={minTemperature}
+          trend={trend}
+          isLoading={isLoading}
+          error={error}
         />
         <div className="md:col-span-2">
-          <SystemStatus />
+          <SystemStatus 
+            humidity={humidity}
+            powerStatus={powerStatus}
+            batteryLevel={batteryLevel}
+          />
         </div>
       </div>
       

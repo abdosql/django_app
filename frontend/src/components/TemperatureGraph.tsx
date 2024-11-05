@@ -11,39 +11,27 @@ import {
   ReferenceLine,
   Legend,
 } from 'recharts';
-
-interface DataPoint {
-  time: string;
-  temperature: number;
-  humidity: number;
-}
+import { useHistoricalReadings } from '../hooks/useHistoricalReadings';
+import { useSystemSettings } from '../hooks/useSystemSettings';
+import { AlertTriangle } from 'lucide-react';
 
 export default function TemperatureGraph() {
-  const [timeRange, setTimeRange] = useState('24h');
-  
-  // Generate sample data
-  const generateData = () => {
-    const now = new Date();
-    const data: DataPoint[] = [];
-    const points = timeRange === '24h' ? 24 : timeRange === '7d' ? 168 : 720; // 24h, 7d, or 30d
+  const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const { readings, isLoading, error } = useHistoricalReadings(timeRange);
+  const { settings } = useSystemSettings();
 
-    for (let i = points - 1; i >= 0; i--) {
-      const time = new Date(now.getTime() - (i * 3600000)); // hourly data points
-      data.push({
-        time: time.toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          day: 'numeric',
-          month: 'short'
-        }),
-        temperature: 4 + Math.sin(i / 8) * 2 + Math.random(), // Simulate temperature fluctuation
-        humidity: 45 + Math.cos(i / 12) * 10 + Math.random() * 5, // Simulate humidity fluctuation
-      });
-    }
-    return data;
+  const formatData = (readings: any[]) => {
+    return readings.map(reading => ({
+      time: new Date(reading.timestamp).toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: 'numeric',
+        month: 'short'
+      }),
+      temperature: reading.temperature,
+      humidity: reading.humidity
+    }));
   };
-
-  const data = generateData();
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -61,6 +49,31 @@ export default function TemperatureGraph() {
     }
     return null;
   };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/4 mb-6"></div>
+          <div className="h-[400px] bg-gray-100 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="text-red-500">
+          <AlertTriangle className="h-6 w-6 mb-2" />
+          <p>Error loading graph data</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const data = formatData(readings);
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -114,7 +127,10 @@ export default function TemperatureGraph() {
             />
             <YAxis
               yAxisId="temp"
-              domain={[-2, 12]}
+              domain={[
+                Math.min(settings.critical_temp_min - 2, 0),
+                Math.max(settings.critical_temp_max + 2, 12)
+              ]}
               tick={{ fontSize: 12 }}
               label={{ value: 'Temperature (°C)', angle: -90, position: 'insideLeft' }}
             />
@@ -128,22 +144,22 @@ export default function TemperatureGraph() {
             
             {/* Temperature threshold areas */}
             <ReferenceArea
-              y1={8}
-              y2={10}
+              y1={settings.normal_temp_max}
+              y2={settings.critical_temp_max}
               yAxisId="temp"
               fill="#fef3c7"
               fillOpacity={0.3}
             />
             <ReferenceArea
-              y1={0}
-              y2={2}
+              y1={settings.critical_temp_min}
+              y2={settings.normal_temp_min}
               yAxisId="temp"
               fill="#fef3c7"
               fillOpacity={0.3}
             />
             <ReferenceArea
-              y1={2}
-              y2={8}
+              y1={settings.normal_temp_min}
+              y2={settings.normal_temp_max}
               yAxisId="temp"
               fill="#dcfce7"
               fillOpacity={0.3}
@@ -151,13 +167,13 @@ export default function TemperatureGraph() {
             
             {/* Critical threshold lines */}
             <ReferenceLine
-              y={2}
+              y={settings.normal_temp_min}
               yAxisId="temp"
               stroke="#f59e0b"
               strokeDasharray="3 3"
             />
             <ReferenceLine
-              y={8}
+              y={settings.normal_temp_max}
               yAxisId="temp"
               stroke="#f59e0b"
               strokeDasharray="3 3"
@@ -191,15 +207,22 @@ export default function TemperatureGraph() {
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="p-3 bg-green-50 rounded-lg">
           <p className="text-sm text-green-700">Normal Range</p>
-          <p className="text-xs text-green-600">2°C - 8°C</p>
+          <p className="text-xs text-green-600">
+            {settings.normal_temp_min}°C - {settings.normal_temp_max}°C
+          </p>
         </div>
         <div className="p-3 bg-amber-50 rounded-lg">
           <p className="text-sm text-amber-700">Critical Range</p>
-          <p className="text-xs text-amber-600">0°C - 2°C, 8°C - 10°C</p>
+          <p className="text-xs text-amber-600">
+            {settings.critical_temp_min}°C - {settings.normal_temp_min}°C,{' '}
+            {settings.normal_temp_max}°C - {settings.critical_temp_max}°C
+          </p>
         </div>
         <div className="p-3 bg-red-50 rounded-lg">
           <p className="text-sm text-red-700">Severe Range</p>
-          <p className="text-xs text-red-600">&lt; 0°C, &gt; 10°C</p>
+          <p className="text-xs text-red-600">
+            &lt;{settings.critical_temp_min}°C, &gt;{settings.critical_temp_max}°C
+          </p>
         </div>
       </div>
     </div>
