@@ -70,8 +70,11 @@ class ReadingViewSet(viewsets.ModelViewSet):
                 reading=reading,
                 message=f"Alert: {alert_type} at {reading.timestamp}"
             )
-            # Notify operators
-            self.notification_service.send_alert(alert)
+            # Create notifications for the alert
+            notification_service = NotificationService()
+            notification_service.process_alert(alert)
+            return alert
+        return None
 
 class AlertViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Alert.objects.all()

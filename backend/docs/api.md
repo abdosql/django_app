@@ -59,7 +59,7 @@
     "temperature": 5.5,
     "humidity": 45.0,
     "power_status": true,
-    "battery_power": false
+    "battery_level": 85.5
 }
 ```
 
@@ -148,6 +148,83 @@
     }
 }
 ```
+### Notifications
+#### List Notifications
+- **Endpoint**: `/api/notifications/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response Example**:
+```json
+[
+    {
+        "id": 1,
+        "operator": {
+            "id": 1,
+            "name": "John Doe",
+            "priority": "Primary"
+        },
+        "alert": {
+            "id": 1,
+            "type": "TEMP_HIGH",
+            "severity": "High",
+            "message": "Temperature exceeded critical threshold"
+        },
+        "status": "SENT",
+        "sent_at": "2024-11-04T14:30:00Z",
+        "read_at": null,
+        "retry_count": 0,
+        "created_at": "2024-11-04T14:30:00Z",
+        "updated_at": "2024-11-04T14:30:00Z"
+    }
+]
+```
+
+#### Mark Notification as Read
+- **Endpoint**: `/api/notifications/{id}/read/`
+- **Method**: `POST`
+- **Authentication**: Required (Operator owner or Admin)
+- **Response**:
+```json
+{
+    "status": "notification marked as read"
+}
+```
+
+#### Get Unread Notifications Count
+- **Endpoint**: `/api/notifications/unread_count/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response**:
+```json
+{
+    "count": 5
+}
+```
+
+#### Get Notifications by Status
+- **Endpoint**: `/api/notifications/by_status/`
+- **Method**: `GET`
+- **Parameters**: 
+  - `status`: One of ['PENDING', 'SENT', 'FAILED', 'READ']
+- **Authentication**: Required
+- **Response**: Same as List Notifications
+
+### Alert Notifications Process
+When an alert is created (based on readings), the system will:
+1. Create notifications for relevant operators based on alert severity:
+   - High (3): All operators
+   - Medium (2): Primary and secondary operators
+   - Low (1): Only primary operators
+2. Store notifications in the database with initial status 'PENDING'
+3. Attempt to send notifications through configured channels (email, telegram)
+4. Update notification status based on delivery result
+
+### Notification Statuses
+- `PENDING`: Initial state, notification created but not yet processed
+- `SENT`: Successfully delivered through at least one channel
+- `FAILED`: Failed to deliver through any channel
+- `READ`: Operator has marked the notification as read
+
 
 #### Operator Actions
 

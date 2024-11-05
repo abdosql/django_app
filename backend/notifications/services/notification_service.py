@@ -1,8 +1,11 @@
 import logging
 from django.utils import timezone
+from django.db.models import Count
 from .telegram_service import TelegramService
 from .email_service import EmailService
-from ..models import Operator
+from ..models import Operator, Notification
+from monitoring.models import Alert
+from settings.models import SystemSettings
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +13,55 @@ class NotificationService:
     def __init__(self):
         self.telegram_service = TelegramService()
         self.email_service = EmailService()
+
+    def process_alert(self, alert):
+        """Process new alert and create notifications"""
+        settings = SystemSettings.get_settings()
+        
+        # Get operators based on alert severity
+        operators = self._get_operators_for_alert(alert)
+        
+        # Create notifications for each operator
+        for operator in operators:
+            self._create_notification(operator, alert)
+    
+    def _get_operators_for_alert(self, alert):
+        """Get operators based on alert severity"""
+        operators = Operator.objects.filter(is_active=True)
+        
+        if alert.severity == 3:  # High severity - notify all operators
+            return operators
+        elif alert.severity == 2:  # Medium severity - notify primary and secondary
+            return operators.filter(priority__lte=2)
+        else:  # Low severity - notify only primary
+            return operators.filter(priority=1)
+    
+    def _create_notification(self, operator, alert):
+        """Create a notification for an operator"""
+        Notification.objects.create(
+            operator=operator,
+            alert=alert,
+            status='PENDING'
+        )
+
+    def get_pending_notifications(self, max_retries=3):
+        """Get pending notifications that haven't exceeded max retries"""
+        return Notification.objects.filter(
+            status='PENDING',
+            retry_count__lt=max_retries
+        )
+
+    def mark_notification_sent(self, notification):
+        """Mark notification as sent"""
+        notification.status = 'SENT'
+        notification.sent_at = timezone.now()
+        notification.save()
+
+    def mark_notification_failed(self, notification):
+        """Mark notification as failed and increment retry count"""
+        notification.status = 'FAILED'
+        notification.retry_count += 1
+        notification.save()
 
     def send_alert(self, alert):
         """Send alert to operators based on severity and priority"""
@@ -47,17 +99,6 @@ class NotificationService:
                 results['email'].append((operator, success))
 
         return results
-
-    def _get_operators_for_alert(self, alert):
-        """Get operators based on alert severity"""
-        operators = Operator.objects.filter(is_active=True)
-        
-        if alert.severity == 3:  # High severity - notify all operators
-            return operators
-        elif alert.severity == 2:  # Medium severity - notify primary and secondary
-            return operators.filter(priority__lte=2)
-        else:  # Low severity - notify only primary
-            return operators.filter(priority=1)
 
     def _format_alert_message(self, alert, operator):
         if isinstance(alert, str):

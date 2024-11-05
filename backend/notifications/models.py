@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from monitoring.models import Alert
 
 class Operator(models.Model):
     PRIORITY_CHOICES = [
@@ -30,3 +31,28 @@ class Operator(models.Model):
         if self.telegram_id and self.notification_preferences.get('telegram_enabled', True):
             channels.append('telegram')
         return channels
+
+class Notification(models.Model):
+    NOTIFICATION_STATUS = [
+        ('PENDING', 'Pending'),
+        ('SENT', 'Sent'),
+        ('FAILED', 'Failed'),
+        ('READ', 'Read')
+    ]
+
+    operator = models.ForeignKey('Operator', on_delete=models.CASCADE)
+    alert = models.ForeignKey(Alert, on_delete=models.CASCADE)
+    status = models.CharField(max_length=10, choices=NOTIFICATION_STATUS, default='PENDING')
+    sent_at = models.DateTimeField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    retry_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        # Prevent duplicate notifications for the same alert and operator
+        unique_together = ['operator', 'alert']
+
+    def __str__(self):
+        return f"Notification for {self.operator.name} - {self.alert.type}"
