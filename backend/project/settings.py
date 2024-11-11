@@ -26,12 +26,13 @@ SECRET_KEY = "django-insecure-k!tojk-x8a#xp@&t86w*er1txq4x6bjgxl1pn0vy6ea3i%-c2#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'temp_monitor_backend']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'temp_monitor_backend',     '192.168.8.155']
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://10.0.2.2:8000",
     "http://localhost:19006",
-    "http://192.168.8.155:8000",  # Ajoutez votre IP locale
+    "http://192.168.8.155:8000",
+    "http://192.168.8.155:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = True  # En développement seulement
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'rest_framework',
     'rest_framework_simplejwt',
+    'corsheaders',
     'authentication',
     'notifications',
     'monitoring',
@@ -56,6 +58,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Ajoutez cette ligne au début
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -64,7 +67,40 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_EXPOSE_HEADERS = [
+    'content-type',
+    'content-length',
+]
+
+# Ajoutez ces origines supplémentaires
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://10.0.2.2:8000",
+    "http://localhost:19006",
+    "http://localhost:3000",
+    "exp://localhost:19000",
+]
 ROOT_URLCONF = "project.urls"
 
 TEMPLATES = [

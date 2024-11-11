@@ -21,6 +21,8 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,temp_monitor_backend
       - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://temp_monitor_frontend:3000
       - CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://temp_monitor_frontend:3000
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://temp_monitor_frontend:3000,http://localhost:8000,http://10.0.2.2:8000,http://localhost:19006
+      - CSRF_TRUSTED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://temp_monitor_frontend:3000,http://localhost:8000,http://10.0.2.2:8000,http://localhost:19006
     depends_on:
       db:
         condition: service_healthy
