@@ -1,13 +1,21 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from django.utils import timezone
 from datetime import timedelta
-from .models import Reading, Alert
-from .serializers import ReadingSerializer, AlertSerializer
+from .models import Reading, Alert, Incident, IncidentComment, IncidentTimelineEvent
+from .serializers import ReadingSerializer, AlertSerializer, IncidentSerializer, IncidentCommentSerializer, IncidentTimelineEventSerializer
 from notifications.services.notification_service import NotificationService
 from settings.models import SystemSettings
+import logging
+from django.db import transaction
+from notifications.models import Operator
+from rest_framework.views import APIView
+from django.db.models import Min, Max, Avg
+from django.db.models.functions import TruncDate
+
+logger = logging.getLogger(__name__)
 
 class ReadingViewSet(viewsets.ModelViewSet):
     queryset = Reading.objects.all()
@@ -31,16 +39,76 @@ class ReadingViewSet(viewsets.ModelViewSet):
     def _check_temperature(self, reading):
         settings = SystemSettings.get_settings()
         
-        if reading.temperature < settings.normal_temp_min:
-            if reading.temperature <= settings.critical_temp_min:
-                self._create_alert(reading, 'TEMP_LOW', severity=3)
+        if not (settings.normal_temp_min <= reading.temperature <= settings.normal_temp_max):
+            # Get or create active incident
+            incident = Incident.objects.filter(
+                status__in=['active', 'acknowledged']
+            ).first()
+            
+            if not incident:
+                incident = Incident.objects.create()
+                alert_type = 'TEMP_HIGH' if reading.temperature > settings.normal_temp_max else 'TEMP_LOW'
+                severity = self._determine_severity(reading.temperature)
+                
+                # Create initial alert
+                alert = self._create_alert(reading, alert_type, severity)
+                
+                # Create timeline event
+                IncidentTimelineEvent.objects.create(
+                    incident=incident,
+                    event_type='alert_created',
+                    description=f"Temperature {alert_type.lower().replace('_', ' ')}",
+                    temperature=reading.temperature
+                )
             else:
-                self._create_alert(reading, 'TEMP_LOW', severity=2)
-        elif reading.temperature > settings.normal_temp_max:
-            if reading.temperature >= settings.critical_temp_max:
-                self._create_alert(reading, 'TEMP_HIGH', severity=3)
-            else:
-                self._create_alert(reading, 'TEMP_HIGH', severity=2)
+                incident.alert_count += 1
+                
+                # Check for escalation
+                if incident.alert_count == 4:
+                    incident.current_escalation_level = 2
+                    self._notify_secondary_operators(incident)
+                elif incident.alert_count == 7:
+                    incident.current_escalation_level = 3
+                    self._notify_tertiary_operators(incident)
+                
+                incident.save()
+        else:
+            # Temperature back to normal, resolve any active incidents
+            active_incidents = Incident.objects.filter(
+                status__in=['active', 'acknowledged']
+            )
+            
+            for incident in active_incidents:
+                incident.status = 'resolved'
+                incident.end_time = timezone.now()
+                incident.save()
+                
+                IncidentTimelineEvent.objects.create(
+                    incident=incident,
+                    event_type='status_changed',
+                    description="Temperature returned to normal range",
+                    temperature=reading.temperature
+                )
+
+    def _notify_secondary_operators(self, incident):
+        operators = Operator.objects.filter(priority=2, is_active=True)
+        self._create_notifications(operators, incident)
+        
+        IncidentTimelineEvent.objects.create(
+            incident=incident,
+            event_type='escalation_changed',
+            description="Escalated to secondary operators"
+        )
+
+    def _notify_tertiary_operators(self, incident):
+        operators = Operator.objects.filter(priority=3, is_active=True)
+        self._create_notifications(operators, incident)
+        
+        IncidentTimelineEvent.objects.create(
+            incident=incident,
+            event_type='escalation_changed',
+            description="Escalated to tertiary operators"
+        )
 
     def _check_power_status(self, reading):
         last_reading = Reading.objects.filter(
@@ -54,27 +122,33 @@ class ReadingViewSet(viewsets.ModelViewSet):
                 self._create_alert(reading, 'POWER_RESTORED', severity=1)
 
     def _create_alert(self, reading, alert_type, severity=2):
+        print(f"\n=== Creating alert ===")
+        print(f"Type: {alert_type}")
+        print(f"Severity: {severity}")
+        
         settings = SystemSettings.get_settings()
         
-        # Check if similar alert exists within reset time
-        recent_alert = Alert.objects.filter(
-            type=alert_type,
-            reading__device_id=reading.device_id,
-            timestamp__gte=timezone.now() - timedelta(minutes=settings.alert_reset_time)
-        ).exists()
-        
-        if not recent_alert:
+        try:
+            # Create the alert
             alert = Alert.objects.create(
                 type=alert_type,
                 severity=severity,
                 reading=reading,
                 message=f"Alert: {alert_type} at {reading.timestamp}"
             )
-            # Create notifications for the alert
+            print(f"Alert created with ID: {alert.id}")
+            
+            # Create notifications using notification service
             notification_service = NotificationService()
-            notification_service.process_alert(alert)
+            notifications = notification_service.process_alert(alert)
+            print(f"Notifications created: {notifications}")
+            
             return alert
-        return None
+            
+        except Exception as e:
+            print(f"Error creating alert: {str(e)}")
+            logger.error(f"Failed to create alert: {str(e)}")
+            raise
 
 class AlertViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Alert.objects.all()
@@ -93,3 +167,144 @@ class AlertViewSet(viewsets.ReadOnlyModelViewSet):
         alert.resolved_at = timezone.now()
         alert.save()
         return Response({'status': 'alert resolved'})
+
+class IncidentViewSet(viewsets.ModelViewSet):
+    queryset = Incident.objects.all()
+    serializer_class = IncidentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status = self.request.query_params.get('status', None)
+        start_date = self.request.query_params.get('start_date', None)
+        end_date = self.request.query_params.get('end_date', None)
+        
+        if status:
+            queryset = queryset.filter(status=status)
+        if start_date:
+            queryset = queryset.filter(start_time__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(start_time__date__lte=end_date)
+            
+        return queryset
+
+    @action(detail=True, methods=['post'])
+    def acknowledge(self, request, pk=None):
+        incident = self.get_object()
+        if incident.status == 'resolved':
+            return Response(
+                {'detail': 'Cannot acknowledge resolved incident'},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+            
+        operator = request.user.operator
+        note = request.data.get('acknowledgment_note', '')
+        
+        with transaction.atomic():
+            incident.status = 'acknowledged'
+            incident.save()
+            
+            # Create comment
+            IncidentComment.objects.create(
+                incident=incident,
+                operator=operator,
+                comment=f"Incident acknowledged: {note}"
+            )
+            
+            # Create timeline event
+            IncidentTimelineEvent.objects.create(
+                incident=incident,
+                event_type='status_changed',
+                description=f"Incident acknowledged by {operator.name}",
+                operator=operator
+            )
+            
+        return Response({'status': 'incident acknowledged'})
+
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        incident = self.get_object()
+        serializer = IncidentCommentSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save(
+                incident=incident,
+                operator=request.user.operator
+            )
+            
+            # Create timeline event
+            IncidentTimelineEvent.objects.create(
+                incident=incident,
+                event_type='comment_added',
+                description=f"Comment added by {request.user.operator.name}",
+                operator=request.user.operator,
+                metadata={'comment': serializer.validated_data['comment']}
+            )
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def timeline(self, request, pk=None):
+        incident = self.get_object()
+        events = incident.timeline_events.all()
+        serializer = IncidentTimelineEventSerializer(events, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def report(self, request, pk=None):
+        incident = self.get_object()
+        format = request.query_params.get('format', 'json')
+        
+        if format == 'json':
+            serializer = self.get_serializer(incident)
+            return Response(serializer.data)
+        elif format in ['pdf', 'csv']:
+            # Implementation for PDF and CSV reports will be added
+            return Response(
+                {'detail': f'{format.upper()} report generation not implemented'},
+                status=status.HTTP_501_NOT_IMPLEMENTED
+            )
+        else:
+            return Response(
+                {'detail': 'Invalid format specified'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+class TemperatureStatsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        period = request.query_params.get('period', 'daily')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        queryset = Reading.objects.all()
+        
+        if start_date:
+            queryset = queryset.filter(timestamp__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(timestamp__date__lte=end_date)
+            
+        if period == 'daily':
+            stats = queryset.annotate(
+                date=TruncDate('timestamp')
+            ).values('date').annotate(
+                min_temperature=Min('temperature'),
+                max_temperature=Max('temperature'),
+                average_temperature=Avg('temperature'),
+                alert_count=models.Count(
+                    'alert',
+                    filter=models.Q(alert__type__in=['TEMP_HIGH', 'TEMP_LOW'])
+                )
+            ).order_by('date')
+            
+            return Response({
+                'period': period,
+                'statistics': stats
+            })
+        
+        # Add weekly/monthly aggregation if needed
+        return Response({
+            'detail': f'Period {period} not implemented'
+        }, status=status.HTTP_501_NOT_IMPLEMENTED)

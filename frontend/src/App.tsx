@@ -9,6 +9,8 @@ import Dashboard from './pages/Dashboard';
 import MyProfile from './pages/MyProfile';
 import OperatorSettings from './pages/OperatorSettings';
 import SystemSettings from './pages/SystemSettings';
+import IncidentDetails from './pages/IncidentDetails';
+import Incidents from './pages/Incidents';
 
 function App() {
   return (
@@ -28,6 +30,8 @@ function App() {
                       <Route path="/profile" element={<MyProfile />} />
                       <Route path="/operator-settings" element={<OperatorSettings />} />
                       <Route path="/system-settings" element={<SystemSettings />} />
+                      <Route path="/incidents/:id" element={<IncidentDetails />} />
+                      <Route path="/incidents" element={<Incidents />} />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </Layout>

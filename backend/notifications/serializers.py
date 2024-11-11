@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Operator
+from .models import Operator, Notification
+from monitoring.serializers import AlertSerializer
 
 User = get_user_model()
 
@@ -43,3 +44,15 @@ class OperatorSerializer(serializers.ModelSerializer):
                 "notification_preferences must contain email_enabled and telegram_enabled"
             )
         return value
+
+class NotificationSerializer(serializers.ModelSerializer):
+    operator = OperatorSerializer(read_only=True)
+    alert = AlertSerializer(read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'operator', 'alert', 'status', 'status_display',
+            'sent_at', 'read_at', 'retry_count', 'created_at', 'updated_at'
+        ]

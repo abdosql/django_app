@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Reading, Alert
+from .models import Reading, Alert, Incident, IncidentComment, IncidentTimelineEvent
 
 class ReadingSerializer(serializers.ModelSerializer):
     battery_level = serializers.FloatField(
@@ -11,7 +11,7 @@ class ReadingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reading
         fields = [
-            'id', 'temperature', 'humidity', 
+            'id', 'device_id', 'temperature', 'humidity', 
             'power_status', 'battery_level', 'timestamp'
         ]
 
@@ -30,3 +30,31 @@ class AlertSerializer(serializers.ModelSerializer):
     class Meta:
         model = Alert
         fields = '__all__'
+
+class IncidentCommentSerializer(serializers.ModelSerializer):
+    operator_name = serializers.CharField(source='operator.name', read_only=True)
+
+    class Meta:
+        model = IncidentComment
+        fields = ['id', 'comment', 'action_taken', 'operator_name', 'timestamp']
+        read_only_fields = ['operator_name', 'timestamp']
+
+class IncidentTimelineEventSerializer(serializers.ModelSerializer):
+    operator_name = serializers.CharField(source='operator.name', read_only=True)
+
+    class Meta:
+        model = IncidentTimelineEvent
+        fields = ['timestamp', 'event_type', 'description', 'temperature', 
+                 'operator_name', 'metadata']
+        read_only_fields = ['timestamp']
+
+class IncidentSerializer(serializers.ModelSerializer):
+    comments = IncidentCommentSerializer(many=True, read_only=True)
+    timeline_events = IncidentTimelineEventSerializer(many=True, read_only=True)
+    temperature_readings = ReadingSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Incident
+        fields = ['id', 'start_time', 'end_time', 'status', 'alert_count',
+                 'current_escalation_level', 'comments', 'timeline_events',
+                 'temperature_readings']

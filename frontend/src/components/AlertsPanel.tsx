@@ -2,6 +2,7 @@ import React from 'react';
 import { AlertTriangle, Bell, CheckCircle, Clock } from 'lucide-react';
 import { useAlerts } from '../hooks/useAlerts';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { Link } from 'react-router-dom';
 
 export default function AlertsPanel() {
   const { alerts, isLoading, error } = useAlerts();
@@ -79,9 +80,10 @@ export default function AlertsPanel() {
           </div>
         ) : (
           alerts.map(alert => (
-            <div 
+            <Link 
+              to={`/incidents/${alert.id}`}
               key={alert.id}
-              className={`p-4 rounded-lg border ${getAlertColor(alert.type)}`}
+              className={`p-4 rounded-lg border ${getAlertColor(alert.type)} hover:opacity-90 transition-opacity`}
             >
               <div className="flex items-start">
                 <AlertTriangle className="h-5 w-5 mr-2 mt-0.5" />
@@ -99,7 +101,7 @@ export default function AlertsPanel() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

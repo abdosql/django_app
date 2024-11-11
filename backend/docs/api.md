@@ -272,6 +272,236 @@ When an alert is created (based on readings), the system will:
 }
 ```
 
+## Incident Management
+
+### Incidents
+#### List Incidents
+- **Endpoint**: `/api/incidents/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Query Parameters**:
+  - `status`: Filter by status (active/resolved)
+  - `start_date`: Filter from date (YYYY-MM-DD)
+  - `end_date`: Filter to date (YYYY-MM-DD)
+- **Response Example**:
+```json
+[
+    {
+        "id": 1,
+        "start_time": "2024-03-20T14:30:00Z",
+        "end_time": null,
+        "status": "active",
+        "alert_count": 3,
+        "current_escalation_level": 1,
+        "temperature_readings": [...],
+        "comments": [...],
+        "notifications": [...]
+    }
+]
+```
+
+#### Get Incident Details
+- **Endpoint**: `/api/incidents/{id}/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response**: Detailed incident information including all related data
+
+#### Add Comment to Incident
+- **Endpoint**: `/api/incidents/{id}/comments/`
+- **Method**: `POST`
+- **Authentication**: Required
+- **Request Body**:
+```json
+{
+    "comment": "Taking action to address temperature issue",
+    "action_taken": true
+}
+```
+
+#### Acknowledge Incident
+- **Endpoint**: `/api/incidents/{id}/acknowledge/`
+- **Method**: `POST`
+- **Authentication**: Required
+- **Request Body**:
+```json
+{
+    "acknowledgment_note": "Issue being investigated"
+}
+```
+
+### Alert Escalation
+#### Get Current Escalation Status
+- **Endpoint**: `/api/alerts/{id}/escalation/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response Example**:
+```json
+{
+    "alert_id": 1,
+    "consecutive_alerts": 5,
+    "escalation_level": 2,
+    "notified_operators": [
+        {
+            "id": 1,
+            "name": "Primary Operator",
+            "priority": 1
+        },
+        {
+            "id": 2,
+            "name": "Secondary Operator",
+            "priority": 2
+        }
+    ],
+    "next_escalation": {
+        "threshold": 7,
+        "operators": [
+            {
+                "id": 3,
+                "name": "Tertiary Operator",
+                "priority": 3
+            }
+        ]
+    }
+}
+```
+
+### Temperature Analysis
+#### Get Temperature Statistics
+- **Endpoint**: `/api/temperature/stats/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Query Parameters**:
+  - `period`: daily/weekly/monthly
+  - `start_date`: YYYY-MM-DD
+  - `end_date`: YYYY-MM-DD
+- **Response Example**:
+```json
+{
+    "period": "daily",
+    "statistics": [
+        {
+            "date": "2024-03-20",
+            "min_temperature": 2.5,
+            "max_temperature": 7.8,
+            "average_temperature": 5.2,
+            "alert_count": 3
+        }
+    ]
+}
+```
+
+### Device Management
+#### Register Device
+- **Endpoint**: `/api/devices/`
+- **Method**: `POST`
+- **Authentication**: Admin only
+- **Request Body**:
+```json
+{
+    "device_id": "FRIDGE_01",
+    "name": "Laboratory Fridge 1",
+    "location": "Lab Room 101",
+    "reading_interval": 20  // in minutes
+}
+```
+
+#### Get Device Status
+- **Endpoint**: `/api/devices/{device_id}/status/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response Example**:
+```json
+{
+    "device_id": "FRIDGE_01",
+    "name": "Laboratory Fridge 1",
+    "last_reading": {
+        "temperature": 5.2,
+        "humidity": 45.0,
+        "timestamp": "2024-03-20T14:30:00Z",
+        "power_status": true,
+        "battery_level": 85
+    },
+    "status": "normal",  // normal, warning, critical
+    "last_communication": "2024-03-20T14:30:00Z",
+    "active_incidents": 0
+}
+```
+
+### Monitoring Configuration
+#### Update Temperature Thresholds
+- **Endpoint**: `/api/settings/temperature-thresholds/`
+- **Method**: `PUT`
+- **Authentication**: Admin only
+- **Request Body**:
+```json
+{
+    "normal_range": {
+        "min": 2.0,
+        "max": 8.0
+    },
+    "critical_range": {
+        "min": 0.0,
+        "max": 10.0
+    }
+}
+```
+
+#### Update Reading Interval
+- **Endpoint**: `/api/settings/reading-interval/`
+- **Method**: `PUT`
+- **Authentication**: Admin only
+- **Request Body**:
+```json
+{
+    "interval": 20,  // minutes
+    "device_id": "FRIDGE_01"  // optional, applies to all devices if not specified
+}
+```
+
+### Incident Reports
+#### Generate Incident Report
+- **Endpoint**: `/api/incidents/{id}/report/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Query Parameters**:
+  - `format`: pdf/csv/json
+- **Response**: Report file in requested format
+
+#### Get Incident Timeline
+- **Endpoint**: `/api/incidents/{id}/timeline/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response Example**:
+```json
+[
+    {
+        "timestamp": "2024-03-20T14:30:00Z",
+        "event_type": "alert_created",
+        "description": "Temperature exceeded normal range",
+        "temperature": 8.5,
+        "operator": null
+    },
+    {
+        "timestamp": "2024-03-20T14:31:00Z",
+        "event_type": "notification_sent",
+        "description": "Alert sent to primary operator",
+        "operator": {
+            "id": 1,
+            "name": "John Doe"
+        }
+    },
+    {
+        "timestamp": "2024-03-20T14:35:00Z",
+        "event_type": "comment_added",
+        "description": "Investigating temperature increase",
+        "operator": {
+            "id": 1,
+            "name": "John Doe"
+        }
+    }
+]
+```
+
 ## Error Responses
 All endpoints may return the following error responses:
 
@@ -305,6 +535,22 @@ All endpoints may return the following error responses:
 }
 ```
 
+### 409 Conflict (for Escalation)
+```json
+{
+    "detail": "Alert escalation already in progress",
+    "current_level": 2,
+    "started_at": "2024-03-20T14:30:00Z"
+}
+```
+
+### 422 Unprocessable Entity
+```json
+{
+    "detail": "Cannot acknowledge resolved incident"
+}
+```
+
 ## Notes
 1. All requests must include the JWT token in the Authorization header:
 ```
@@ -324,3 +570,54 @@ Authorization: Bearer <access_token>
    - Primary (1)
    - Secondary (2)
    - Tertiary (3)
+
+5. Alert Escalation Process
+   - First alert: Primary operator notified
+   - After 4 consecutive alerts: Secondary operator also notified
+   - After 7 consecutive alerts: Tertiary operator also notified
+   - Temperature returns to normal: Escalation resets
+
+6. Incident States
+   - `active`: Ongoing temperature issue
+   - `acknowledged`: Operator has acknowledged the incident
+   - `resolved`: Temperature returned to normal
+   - `closed`: Incident manually closed with resolution notes
+
+7. Operator Response Requirements
+   - Primary operators must acknowledge alerts within 15 minutes
+   - Secondary operators must acknowledge alerts within 30 minutes
+   - Tertiary operators must acknowledge alerts within 1 hour
+
+8. Report Types
+   - Incident Summary Report
+     - Timeline of events
+     - Temperature graph
+     - Operator responses
+     - Resolution notes
+
+   - Daily/Weekly/Monthly Reports
+     - Temperature trends
+     - Alert statistics
+     - Response times
+     - Compliance metrics
+
+9. Reading Intervals
+   - Default interval: 20 minutes
+   - Minimum interval: 1 minute
+   - Maximum interval: 60 minutes
+
+10. Temperature Classifications
+    - Normal: 2°C to 8°C
+    - Critical: 0°C to 2°C or 8°C to 10°C
+    - Severe: < 0°C or > 10°C
+
+11. Device Requirements
+    - Must report temperature every 20 minutes
+    - Must include humidity readings
+    - Must report power status and battery level
+    - Should maintain connection status
+
+12. Alert Response Times
+    - Primary operator: 15 minutes
+    - Secondary operator: 30 minutes
+    - Tertiary operator: 60 minutes

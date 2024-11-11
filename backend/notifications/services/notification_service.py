@@ -16,33 +16,59 @@ class NotificationService:
 
     def process_alert(self, alert):
         """Process new alert and create notifications"""
-        settings = SystemSettings.get_settings()
-        
-        # Get operators based on alert severity
-        operators = self._get_operators_for_alert(alert)
-        
-        # Create notifications for each operator
-        for operator in operators:
-            self._create_notification(operator, alert)
-    
+        print(f"\n=== Processing alert {alert.id} ===")
+        try:
+            # Get operators based on alert severity
+            operators = self._get_operators_for_alert(alert)
+            print(f"Found {len(operators)} operators for severity {alert.severity}")
+            
+            # Create notifications for each operator
+            notifications = []
+            for operator in operators:
+                print(f"Creating notification for operator: {operator.name}")
+                notification = self._create_notification(operator, alert)
+                if notification:
+                    notifications.append(notification)
+                    print(f"Notification created with ID: {notification.id}")
+            
+            print(f"Created {len(notifications)} notifications")
+            return notifications
+            
+        except Exception as e:
+            print(f"Error processing alert: {str(e)}")
+            logger.error(f"Failed to process alert: {str(e)}")
+            raise
+
     def _get_operators_for_alert(self, alert):
         """Get operators based on alert severity"""
+        print(f"\n=== Getting operators for alert severity {alert.severity} ===")
         operators = Operator.objects.filter(is_active=True)
+        print(f"Total active operators: {operators.count()}")
         
         if alert.severity == 3:  # High severity - notify all operators
+            print("HIGH severity - returning all operators")
             return operators
         elif alert.severity == 2:  # Medium severity - notify primary and secondary
-            return operators.filter(priority__lte=2)
+            operators = operators.filter(priority__lte=2)
+            print(f"MEDIUM severity - returning {operators.count()} primary/secondary operators")
+            return operators
         else:  # Low severity - notify only primary
-            return operators.filter(priority=1)
+            operators = operators.filter(priority=1)
+            print(f"LOW severity - returning {operators.count()} primary operators")
+            return operators
     
     def _create_notification(self, operator, alert):
         """Create a notification for an operator"""
-        Notification.objects.create(
-            operator=operator,
-            alert=alert,
-            status='PENDING'
-        )
+        try:
+            notification = Notification.objects.create(
+                operator=operator,
+                alert=alert,
+                status='PENDING'
+            )
+            return notification
+        except Exception as e:
+            logger.error(f"Failed to create notification: {str(e)}")
+            return None
 
     def get_pending_notifications(self, max_retries=3):
         """Get pending notifications that haven't exceeded max retries"""
