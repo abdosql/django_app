@@ -14,6 +14,7 @@ from notifications.models import Operator
 from rest_framework.views import APIView
 from django.db.models import Min, Max, Avg
 from django.db.models.functions import TruncDate
+from django.core.exceptions import PermissionDenied
 
 logger = logging.getLogger(__name__)
 
@@ -205,16 +206,73 @@ class IncidentViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    def _get_operator_or_fail(self):
+        """Get operator for current user or raise appropriate error"""
+        try:
+            return self.request.user.operator
+        except User.operator.RelatedObjectDoesNotExist:
+            raise PermissionDenied(
+                detail="You must be an operator to perform this action. Please contact an administrator."
+            )
+
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        """
+        Add a comment to an incident with optional action taken flag.
+        Endpoint: POST /api/incidents/{id}/add_comment/
+        """
+        incident = self.get_object()
+        operator = self._get_operator_or_fail()
+        serializer = IncidentCommentSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            with transaction.atomic():
+                # Save the comment
+                comment = serializer.save(
+                    incident=incident,
+                    operator=operator
+                )
+                
+                # Create timeline event
+                IncidentTimelineEvent.objects.create(
+                    incident=incident,
+                    event_type='comment_added',
+                    description=f"Comment added by {operator.name}",
+                    operator=operator,
+                    metadata={
+                        'comment': serializer.validated_data['comment'],
+                        'action_taken': serializer.validated_data.get('action_taken', False)
+                    }
+                )
+
+                # If action was taken, update incident status
+                if serializer.validated_data.get('action_taken', False):
+                    incident.status = 'acknowledged'
+                    incident.save()
+                    
+                    # Create additional timeline event for action taken
+                    IncidentTimelineEvent.objects.create(
+                        incident=incident,
+                        event_type='status_changed',
+                        description=f"Action taken by {operator.name}",
+                        operator=operator,
+                        metadata={'action': 'acknowledged'}
+                    )
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=True, methods=['post'])
     def acknowledge(self, request, pk=None):
         incident = self.get_object()
+        operator = self._get_operator_or_fail()
+        
         if incident.status == 'resolved':
             return Response(
                 {'detail': 'Cannot acknowledge resolved incident'},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
-            
-        operator = request.user.operator
+        
         note = request.data.get('acknowledgment_note', '')
         
         with transaction.atomic():
@@ -238,28 +296,16 @@ class IncidentViewSet(viewsets.ModelViewSet):
             
         return Response({'status': 'incident acknowledged'})
 
-    @action(detail=True, methods=['post'])
-    def add_comment(self, request, pk=None):
+    @action(detail=True, methods=['get'])
+    def comments(self, request, pk=None):
+        """
+        Get all comments for an incident.
+        Endpoint: GET /api/incidents/{id}/comments/
+        """
         incident = self.get_object()
-        serializer = IncidentCommentSerializer(data=request.data)
-        
-        if serializer.is_valid():
-            serializer.save(
-                incident=incident,
-                operator=request.user.operator
-            )
-            
-            # Create timeline event
-            IncidentTimelineEvent.objects.create(
-                incident=incident,
-                event_type='comment_added',
-                description=f"Comment added by {request.user.operator.name}",
-                operator=request.user.operator,
-                metadata={'comment': serializer.validated_data['comment']}
-            )
-            
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        comments = incident.comments.all().select_related('operator')
+        serializer = IncidentCommentSerializer(comments, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def timeline(self, request, pk=None):

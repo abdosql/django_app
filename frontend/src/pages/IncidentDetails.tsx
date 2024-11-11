@@ -106,7 +106,7 @@ export default function IncidentDetails() {
   const handleAddComment = async () => {
     try {
       const token = sessionStorage.getItem('access_token');
-      const response = await fetch(`/api/incidents/${id}/comments/`, {
+      const response = await fetch(`/api/incidents/${id}/comment/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -114,17 +114,19 @@ export default function IncidentDetails() {
         },
         body: JSON.stringify({
           comment: newComment,
-          action_taken: isActionTaken
+          action_taken: isActionTaken,
+          incident_id: id
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add comment');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to add comment');
       }
 
       setNewComment('');
       setIsActionTaken(false);
-      fetchIncidentDetails();
+      await fetchIncidentDetails();
     } catch (error) {
       console.error('Error adding comment:', error);
       setError(error instanceof Error ? error.message : 'Failed to add comment');
@@ -144,6 +146,10 @@ export default function IncidentDetails() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getOperatorName = (comment: Comment) => {
+    return comment.operator?.name || 'Unknown Operator';
   };
 
   if (isLoading) {
@@ -167,6 +173,9 @@ export default function IncidentDetails() {
       </div>
     );
   }
+
+  const comments = incident.comments || [];
+  const notifications = incident.notifications || [];
 
   return (
     <div className="space-y-6">
@@ -204,28 +213,34 @@ export default function IncidentDetails() {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Comments & Actions</h2>
             <div className="space-y-4 mb-6">
-              {incident.comments.map((comment) => (
-                <div key={comment.id} className="flex space-x-3">
-                  <div className="flex-shrink-0">
-                    {comment.action_taken ? (
-                      <AlertCircle className="h-6 w-6 text-indigo-500" />
-                    ) : (
-                      <MessageSquare className="h-6 w-6 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 bg-gray-50 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-gray-900">
-                        {comment.operator.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {formatDistanceToNow(parseISO(comment.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                    <p className="mt-1 text-sm text-gray-700">{comment.comment}</p>
-                  </div>
+              {comments.length === 0 ? (
+                <div className="text-center py-6 text-gray-500">
+                  No comments yet
                 </div>
-              ))}
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="flex space-x-3">
+                    <div className="flex-shrink-0">
+                      {comment.action_taken ? (
+                        <AlertCircle className="h-6 w-6 text-indigo-500" />
+                      ) : (
+                        <MessageSquare className="h-6 w-6 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1 bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-gray-900">
+                          {getOperatorName(comment)}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {formatDistanceToNow(parseISO(comment.created_at), { addSuffix: true })}
+                        </p>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-700">{comment.comment}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Add Comment Form */}
@@ -291,25 +306,31 @@ export default function IncidentDetails() {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Notifications</h3>
             <div className="space-y-3">
-              {incident.notifications.map((notification) => (
-                <div key={notification.id} className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-900">
-                      {notification.operator.name}
-                    </span>
-                    <span className="ml-2 text-xs text-gray-500">
-                      (Priority {notification.operator.priority})
+              {notifications.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">
+                  No notifications yet
+                </div>
+              ) : (
+                notifications.map((notification) => (
+                  <div key={notification.id} className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {notification.operator?.name || 'Unknown Operator'}
+                      </span>
+                      <span className="ml-2 text-xs text-gray-500">
+                        (Priority {notification.operator?.priority || 'N/A'})
+                      </span>
+                    </div>
+                    <span className={`text-xs font-medium ${
+                      notification.status === 'READ' ? 'text-green-600' :
+                      notification.status === 'SENT' ? 'text-yellow-600' :
+                      'text-red-600'
+                    }`}>
+                      {notification.status}
                     </span>
                   </div>
-                  <span className={`text-xs font-medium ${
-                    notification.status === 'READ' ? 'text-green-600' :
-                    notification.status === 'SENT' ? 'text-yellow-600' :
-                    'text-red-600'
-                  }`}>
-                    {notification.status}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -280,7 +280,7 @@ When an alert is created (based on readings), the system will:
 - **Method**: `GET`
 - **Authentication**: Required
 - **Query Parameters**:
-  - `status`: Filter by status (active/resolved)
+  - `status`: Filter by status (active/acknowledged/resolved/closed)
   - `start_date`: Filter from date (YYYY-MM-DD)
   - `end_date`: Filter to date (YYYY-MM-DD)
 - **Response Example**:
@@ -293,21 +293,61 @@ When an alert is created (based on readings), the system will:
         "status": "active",
         "alert_count": 3,
         "current_escalation_level": 1,
-        "temperature_readings": [...],
-        "comments": [...],
-        "notifications": [...]
+        "comments": [
+            {
+                "id": 1,
+                "comment": "Investigating temperature increase",
+                "action_taken": true,
+                "timestamp": "2024-03-20T14:35:00Z",
+                "operator_name": "John Doe",
+                "operator_priority": 1
+            }
+        ],
+        "timeline_events": [
+            {
+                "timestamp": "2024-03-20T14:30:00Z",
+                "event_type": "alert_created",
+                "description": "Temperature exceeded normal range",
+                "temperature": 8.5,
+                "operator_name": null,
+                "metadata": {}
+            }
+        ],
+        "temperature_readings": [
+            {
+                "id": 1,
+                "device_id": "FRIDGE_01",
+                "temperature": 8.5,
+                "humidity": 45.0,
+                "power_status": true,
+                "battery_level": 85,
+                "timestamp": "2024-03-20T14:30:00Z"
+            }
+        ]
     }
 ]
 ```
 
-#### Get Incident Details
-- **Endpoint**: `/api/incidents/{id}/`
+#### Get Incident Comments
+- **Endpoint**: `/api/incidents/{id}/comments/`
 - **Method**: `GET`
 - **Authentication**: Required
-- **Response**: Detailed incident information including all related data
+- **Response Example**:
+```json
+[
+    {
+        "id": 1,
+        "comment": "Investigating temperature increase",
+        "action_taken": true,
+        "timestamp": "2024-03-20T14:35:00Z",
+        "operator_name": "John Doe",
+        "operator_priority": 1
+    }
+]
+```
 
 #### Add Comment to Incident
-- **Endpoint**: `/api/incidents/{id}/comments/`
+- **Endpoint**: `/api/incidents/{id}/add_comment/`
 - **Method**: `POST`
 - **Authentication**: Required
 - **Request Body**:
@@ -317,6 +357,21 @@ When an alert is created (based on readings), the system will:
     "action_taken": true
 }
 ```
+- **Response**: Returns the created comment with operator information
+```json
+{
+    "id": 2,
+    "comment": "Taking action to address temperature issue",
+    "action_taken": true,
+    "timestamp": "2024-03-20T14:40:00Z",
+    "operator_name": "John Doe",
+    "operator_priority": 1
+}
+```
+- **Notes**: 
+  - If `action_taken` is true, incident status will be updated to "acknowledged"
+  - Creates timeline events for both comment and action taken
+  - All changes are atomic (transaction-protected)
 
 #### Acknowledge Incident
 - **Endpoint**: `/api/incidents/{id}/acknowledge/`
@@ -326,6 +381,74 @@ When an alert is created (based on readings), the system will:
 ```json
 {
     "acknowledgment_note": "Issue being investigated"
+}
+```
+- **Response**:
+```json
+{
+    "status": "incident acknowledged"
+}
+```
+- **Error Responses**:
+  - 422 Unprocessable Entity if incident is already resolved
+```json
+{
+    "detail": "Cannot acknowledge resolved incident"
+}
+```
+
+#### Get Incident Timeline
+- **Endpoint**: `/api/incidents/{id}/timeline/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Response Example**:
+```json
+[
+    {
+        "timestamp": "2024-03-20T14:30:00Z",
+        "event_type": "alert_created",
+        "description": "Temperature exceeded normal range",
+        "temperature": 8.5,
+        "operator_name": null,
+        "metadata": {}
+    },
+    {
+        "timestamp": "2024-03-20T14:35:00Z",
+        "event_type": "comment_added",
+        "description": "Comment added by John Doe",
+        "temperature": null,
+        "operator_name": "John Doe",
+        "metadata": {
+            "comment": "Investigating temperature increase",
+            "action_taken": true
+        }
+    },
+    {
+        "timestamp": "2024-03-20T14:35:00Z",
+        "event_type": "status_changed",
+        "description": "Action taken by John Doe",
+        "temperature": null,
+        "operator_name": "John Doe",
+        "metadata": {
+            "action": "acknowledged"
+        }
+    }
+]
+```
+
+#### Generate Incident Report
+- **Endpoint**: `/api/incidents/{id}/report/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Query Parameters**:
+  - `format`: json/pdf/csv (currently only json is implemented)
+- **Response**: 
+  - For JSON format: Complete incident details including comments, timeline, and readings
+  - For PDF/CSV: Currently returns 501 Not Implemented
+- **Error Response**:
+```json
+{
+    "detail": "PDF report generation not implemented"
 }
 ```
 
@@ -456,50 +579,6 @@ When an alert is created (based on readings), the system will:
     "interval": 20,  // minutes
     "device_id": "FRIDGE_01"  // optional, applies to all devices if not specified
 }
-```
-
-### Incident Reports
-#### Generate Incident Report
-- **Endpoint**: `/api/incidents/{id}/report/`
-- **Method**: `GET`
-- **Authentication**: Required
-- **Query Parameters**:
-  - `format`: pdf/csv/json
-- **Response**: Report file in requested format
-
-#### Get Incident Timeline
-- **Endpoint**: `/api/incidents/{id}/timeline/`
-- **Method**: `GET`
-- **Authentication**: Required
-- **Response Example**:
-```json
-[
-    {
-        "timestamp": "2024-03-20T14:30:00Z",
-        "event_type": "alert_created",
-        "description": "Temperature exceeded normal range",
-        "temperature": 8.5,
-        "operator": null
-    },
-    {
-        "timestamp": "2024-03-20T14:31:00Z",
-        "event_type": "notification_sent",
-        "description": "Alert sent to primary operator",
-        "operator": {
-            "id": 1,
-            "name": "John Doe"
-        }
-    },
-    {
-        "timestamp": "2024-03-20T14:35:00Z",
-        "event_type": "comment_added",
-        "description": "Investigating temperature increase",
-        "operator": {
-            "id": 1,
-            "name": "John Doe"
-        }
-    }
-]
 ```
 
 ## Error Responses

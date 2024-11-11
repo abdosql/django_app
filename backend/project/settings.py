@@ -27,6 +27,15 @@ SECRET_KEY = "django-insecure-k!tojk-x8a#xp@&t86w*er1txq4x6bjgxl1pn0vy6ea3i%-c2#
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'temp_monitor_backend']
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://10.0.2.2:8000",
+    "http://localhost:19006",
+    "http://192.168.8.155:8000",  # Ajoutez votre IP locale
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True  # En développement seulement
+
 
 # Application definition
 

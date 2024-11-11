@@ -33,11 +33,27 @@ class AlertSerializer(serializers.ModelSerializer):
 
 class IncidentCommentSerializer(serializers.ModelSerializer):
     operator_name = serializers.CharField(source='operator.name', read_only=True)
+    operator_priority = serializers.IntegerField(source='operator.priority', read_only=True)
 
     class Meta:
         model = IncidentComment
-        fields = ['id', 'comment', 'action_taken', 'operator_name', 'timestamp']
-        read_only_fields = ['operator_name', 'timestamp']
+        fields = [
+            'id', 
+            'comment', 
+            'action_taken', 
+            'timestamp', 
+            'operator_name',
+            'operator_priority'
+        ]
+        read_only_fields = ['id', 'timestamp', 'operator_name', 'operator_priority']
+
+    def validate(self, data):
+        # Ensure comment is not empty
+        if not data.get('comment', '').strip():
+            raise serializers.ValidationError({
+                'comment': 'Comment cannot be empty'
+            })
+        return data
 
 class IncidentTimelineEventSerializer(serializers.ModelSerializer):
     operator_name = serializers.CharField(source='operator.name', read_only=True)
