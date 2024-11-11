@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from monitoring.models import Alert
+from monitoring.models import Alert, Incident
 
 class Operator(models.Model):
     PRIORITY_CHOICES = [
@@ -33,26 +33,44 @@ class Operator(models.Model):
         return channels
 
 class Notification(models.Model):
-    NOTIFICATION_STATUS = [
+    NOTIFICATION_TYPES = [
+        ('EMAIL', 'Email'),
+        ('TELEGRAM', 'Telegram'),
+        ('SMS', 'SMS'),
+    ]
+
+    STATUS_CHOICES = [
         ('PENDING', 'Pending'),
         ('SENT', 'Sent'),
         ('FAILED', 'Failed'),
-        ('READ', 'Read')
+        ('DELIVERED', 'Delivered'),
+        ('READ', 'Read'),
     ]
 
-    operator = models.ForeignKey('Operator', on_delete=models.CASCADE)
-    alert = models.ForeignKey(Alert, on_delete=models.CASCADE)
-    status = models.CharField(max_length=10, choices=NOTIFICATION_STATUS, default='PENDING')
+    operator = models.ForeignKey(Operator, on_delete=models.CASCADE, related_name='notifications')
+    incident = models.ForeignKey('monitoring.Incident', on_delete=models.CASCADE, related_name='notifications')
+    alert = models.ForeignKey('monitoring.Alert', on_delete=models.CASCADE, null=True, blank=True)
+    
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    
+    message = models.TextField()
     sent_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
-    retry_count = models.IntegerField(default=0)
+    
+    error_message = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
-        # Prevent duplicate notifications for the same alert and operator
-        unique_together = ['operator', 'alert']
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['operator', 'created_at']),
+        ]
 
     def __str__(self):
-        return f"Notification for {self.operator.name} - {self.alert.type}"
+        return f"{self.get_notification_type_display()} to {self.operator.name} - {self.status}"

@@ -22,6 +22,23 @@ class ReadingViewSet(viewsets.ModelViewSet):
     serializer_class = ReadingSerializer
     notification_service = NotificationService()
 
+    def _determine_severity(self, temperature):
+        """
+        Determine alert severity based on temperature:
+        - Normal: 2°C to 8°C
+        - Critical: 0°C to 2°C or 8°C to 10°C
+        - Severe: < 0°C or > 10°C
+        """
+        settings = SystemSettings.get_settings()
+        
+        if temperature < settings.critical_temp_min or temperature > settings.critical_temp_max:
+            return 3  # High severity for severe temperatures
+        elif (settings.critical_temp_min <= temperature < settings.normal_temp_min or 
+              settings.normal_temp_max < temperature <= settings.critical_temp_max):
+            return 2  # Medium severity for critical temperatures
+        else:
+            return 1  # Low severity for normal range (shouldn't typically occur)
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
