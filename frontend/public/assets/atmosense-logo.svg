@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120">
+  <!-- Icon container -->
+  <rect x="20" y="20" width="80" height="80" rx="12" fill="#5B6EF5"/>
+  
+  <!-- Minimal line representing monitoring/power -->
+  <path d="M35 60 L45 50 L55 70 L65 40 L85 60" 
+        stroke="white" 
+        stroke-width="4" 
+        stroke-linecap="round" 
+        fill="none"/>
+  
+  <!-- Small dot indicator -->
+  <circle cx="85" cy="60" r="3" fill="white"/>
+  
+  <!-- Company Name -->
+  <text x="120" y="73" 
+        font-family="Arial, sans-serif" 
+        font-weight="600" 
+        font-size="38" 
+        fill="#2D3748">
+    Atmo<tspan fill="#5B6EF5">sense</tspan>
+  </text>
+</svg>
