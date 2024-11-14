@@ -27,7 +27,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
-    # ... your other apps ...
+    'monitoring',
+    'notifications',
+    'settings',
 ]
 
 MIDDLEWARE = [
@@ -84,7 +86,7 @@ DATABASES = {
 # Rest Framework settings (if you're using DRF)
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
