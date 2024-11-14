@@ -15,7 +15,7 @@ CORS_ALLOWED_ORIGINS = environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
 
-ALLOWED_HOSTS = environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') + ['54.37.66.72']
 
 # Application definition
 INSTALLED_APPS = [
@@ -27,9 +27,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
-    'monitoring',
-    'notifications',
-    'settings',
+    # ... your other apps ...
 ]
 
 MIDDLEWARE = [
@@ -86,7 +84,7 @@ DATABASES = {
 # Rest Framework settings (if you're using DRF)
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
