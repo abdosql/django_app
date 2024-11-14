@@ -15,7 +15,7 @@ CORS_ALLOWED_ORIGINS = environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
 
-ALLOWED_HOSTS = environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,54.37.66.72').split(',')
 
 # Application definition
 INSTALLED_APPS = [
