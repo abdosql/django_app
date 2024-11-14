@@ -1,5 +1,11 @@
 from os import environ
 from pathlib import Path
+import os
+
+# Add this near the top of your settings.py
+print("DEBUG Settings:")
+print("ALLOWED_HOSTS:", ALLOWED_HOSTS)
+print("All environment variables:", dict(os.environ))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,7 +21,13 @@ CORS_ALLOWED_ORIGINS = environ.get('CORS_ALLOWED_ORIGINS', '').split(',')
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
 
-ALLOWED_HOSTS = environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,54.37.66.72').split(',')
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '54.37.66.72',
+    '54.37.66.72:8000',
+    '*',
+]
 
 # Application definition
 INSTALLED_APPS = [
