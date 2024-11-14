@@ -28,6 +28,10 @@ INSTALLED_APPS = [
     'myapi',
     'rest_framework',
     'corsheaders',
+    'authentication',
+    'monitoring',
+    'notifications',
+    'settings',
     # ... your other apps ...
 ]
 
