@@ -23,8 +23,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY backend/ .
 
-# Add this line to add the backend directory to Python path
-ENV PYTHONPATH=/app:$PYTHONPATH
+# Update PYTHONPATH to include the src directory
+ENV PYTHONPATH=/app:/app/src:$PYTHONPATH
 
 # Expose port
 EXPOSE 8000
