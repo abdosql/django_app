@@ -1,5 +1,5 @@
 # Use Python 3.9 slim image
-FROM python:3.9-slim
+FROM python:3.9
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -23,8 +23,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY backend/ .
 
+# Add this line to add the backend directory to Python path
+ENV PYTHONPATH=/app:$PYTHONPATH
+
 # Expose port
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
