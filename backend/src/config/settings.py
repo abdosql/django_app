@@ -1,11 +1,5 @@
 from os import environ
 from pathlib import Path
-import os
-
-# Add this near the top of your settings.py
-print("DEBUG Settings:")
-print("ALLOWED_HOSTS:", ALLOWED_HOSTS)
-print("All environment variables:", dict(os.environ))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +22,6 @@ ALLOWED_HOSTS = [
     '54.37.66.72:8000',
     '*',
 ]
-
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
