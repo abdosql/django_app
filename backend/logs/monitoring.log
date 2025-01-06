@@ -1,0 +1,4 @@
+INFO 2025-01-06 15:28:53,431 middleware 45 140062954096320 Request: GET /api/monitoring/readings/ from 192.168.65.1
+INFO 2025-01-06 15:28:54,884 middleware 45 140062954096320 Response: 200 for GET /api/monitoring/readings/
+INFO 2025-01-06 15:28:54,896 middleware 45 140062840850112 Request: GET /api/monitoring/readings/ from 192.168.65.1
+INFO 2025-01-06 15:28:56,394 middleware 45 140062840850112 Response: 200 for GET /api/monitoring/readings/

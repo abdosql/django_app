@@ -42,18 +42,23 @@ class UserService {
   async getUserProfile() {
     const response = await this.fetchWithAuth('/auth/users/me/');
     if (!response.ok) {
-      throw new Error('Failed to fetch user profile');
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.detail || 'Failed to fetch user profile');
     }
     return response.json();
   }
 
   async updateUserProfile(data: any) {
+    console.log('Updating profile with data:', data);
     const response = await this.fetchWithAuth('/auth/users/me/', {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+    
     if (!response.ok) {
-      throw new Error('Failed to update user profile');
+      const error = await response.json().catch(() => ({}));
+      console.error('Update profile error:', error);
+      throw new Error(error.detail || 'Failed to update user profile');
     }
     return response.json();
   }

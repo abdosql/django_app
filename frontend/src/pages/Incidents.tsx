@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, AlertTriangle } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { apiService } from '../services/api.service';
 
 interface Incident {
   id: number;
@@ -14,26 +15,19 @@ interface Incident {
 export default function Incidents() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
-        const response = await fetch('/api/incidents/', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch incidents');
+        const response = await apiService.getIncidents();
+        if (response.error) {
+          throw new Error(response.error);
         }
-
-        const data = await response.json();
-        setIncidents(data);
+        setIncidents(response.data || []);
       } catch (error) {
         console.error('Error:', error);
+        setError(error instanceof Error ? error.message : 'Failed to fetch incidents');
       } finally {
         setIsLoading(false);
       }
@@ -49,6 +43,16 @@ export default function Incidents() {
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-24 bg-gray-100 rounded"></div>
         ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Incidents</h3>
+        <p className="text-gray-500">{error}</p>
       </div>
     );
   }

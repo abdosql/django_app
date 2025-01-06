@@ -21,26 +21,34 @@ export default function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProp
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const menuItems = [
+  const baseMenuItems = [
     {
       icon: <User className="w-4 h-4" />,
       label: 'My Profile',
       description: 'Manage your account settings',
       path: '/profile'
     },
+  ];
+
+  const operatorMenuItems = user?.operatorId ? [
     {
       icon: <Shield className="w-4 h-4" />,
       label: 'Operator Settings',
       description: 'Configure notification rules',
       path: '/operator-settings'
     },
+  ] : [];
+
+  const adminMenuItems = user?.isStaff ? [
     {
       icon: <Settings className="w-4 h-4" />,
       label: 'System Settings',
       description: 'Configure temperature thresholds',
       path: '/system-settings'
     },
-  ];
+  ] : [];
+
+  const menuItems = [...baseMenuItems, ...operatorMenuItems, ...adminMenuItems];
 
   if (!isOpen) return null;
 
@@ -81,8 +89,8 @@ export default function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProp
   };
 
   const getUserRole = () => {
-    if (user?.is_staff) return 'Admin';
-    if (user?.is_operator) return 'Operator';
+    if (user?.isStaff) return 'Admin';
+    if (user?.operatorId) return 'Operator';
     return 'Viewer';
   };
 
@@ -102,11 +110,13 @@ export default function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProp
         {menuItems.map((item, index) => (
           <button
             key={index}
-            className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors duration-150"
             onClick={() => handleNavigation(item.path)}
+            className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors duration-150"
           >
             <div className="flex items-center">
-              <span className="text-gray-500">{item.icon}</span>
+              <div className="flex-shrink-0 text-gray-400">
+                {item.icon}
+              </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-900">{item.label}</p>
                 <p className="text-xs text-gray-500">{item.description}</p>
@@ -116,14 +126,14 @@ export default function ProfileDropdown({ isOpen, onClose }: ProfileDropdownProp
         ))}
       </div>
 
-      {/* Logout Button */}
+      {/* Logout */}
       <div className="border-t border-gray-100">
         <button
-          className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors duration-150 flex items-center text-red-600"
           onClick={handleLogout}
+          className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors duration-150 flex items-center text-red-600"
         >
           <LogOut className="w-4 h-4 mr-3" />
-          <span className="text-sm font-medium">Sign Out</span>
+          <span className="text-sm font-medium">Sign out</span>
         </button>
       </div>
     </div>

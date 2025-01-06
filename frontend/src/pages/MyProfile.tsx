@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, Shield, Calendar } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { userService } from '../services/user.service';
 import FlashMessage from '../components/FlashMessage';
 
 interface UserProfile {
@@ -12,6 +13,7 @@ interface UserProfile {
   is_staff: boolean;
   operator_id?: number;
   operator_priority?: number;
+  join_date?: string;
 }
 
 interface FlashState {
@@ -29,29 +31,14 @@ export default function MyProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
-        const userId = sessionStorage.getItem('user_id');
-
-        if (!userId) {
-          throw new Error('User ID not found');
-        }
-
-        const response = await fetch(`/api/auth/users/${userId}/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile');
-        }
-        
-        const data = await response.json();
+        const data = await userService.getUserProfile();
         setProfile(data);
       } catch (error) {
         console.error('Failed to fetch profile:', error);
+        setFlash({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Failed to load profile'
+        });
       } finally {
         setIsLoading(false);
       }
@@ -65,42 +52,30 @@ export default function MyProfile() {
     
     setIsSaving(true);
     try {
-      const token = sessionStorage.getItem('access_token');
-      const userId = sessionStorage.getItem('user_id');
-
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-
+      console.log('Submitting profile update:', profile);
       const updateData = {
-        email: profile.email,
         first_name: profile.first_name,
         last_name: profile.last_name,
-        phone: profile.phone,
-        is_operator: profile.operator_id ? true : false,
+        phone: profile.phone || '',
       };
 
-      const response = await fetch(`/api/auth/users/${userId}/`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update profile');
-      }
-
-      const data = await response.json();
+      const data = await userService.updateUserProfile(updateData);
       setProfile(data);
       setFlash({
         type: 'success',
         message: 'Profile updated successfully'
       });
+
+      // Update the user data in session storage
+      const userData = sessionStorage.getItem('user_data');
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        sessionStorage.setItem('user_data', JSON.stringify({
+          ...parsedData,
+          first_name: data.first_name,
+          last_name: data.last_name,
+        }));
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
       setFlash({
@@ -151,7 +126,7 @@ export default function MyProfile() {
               {profile?.first_name} {profile?.last_name}
             </h2>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 mt-2">
-              {profile?.is_staff ? 'Admin Operator' : profile?.operator_id ? `Operator (Priority ${profile.operator_priority})` : 'Viewer'}
+              {profile?.is_staff ? 'Admin' : profile?.operator_id ? `Operator (Priority ${profile.operator_priority})` : 'Viewer'}
             </span>
           </div>
         </div>
@@ -159,26 +134,35 @@ export default function MyProfile() {
         {/* Profile Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-6">
+            {/* First Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Full Name</label>
+              <label className="block text-sm font-medium text-gray-700">First Name</label>
               <div className="mt-1 flex items-center">
                 <User className="h-5 w-5 text-gray-400 mr-2" />
                 <input
                   type="text"
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={`${profile?.first_name || ''} ${profile?.last_name || ''}`}
-                  onChange={(e) => {
-                    const [first, ...rest] = e.target.value.split(' ');
-                    setProfile(prev => prev ? {
-                      ...prev,
-                      first_name: first,
-                      last_name: rest.join(' ')
-                    } : null);
-                  }}
+                  value={profile?.first_name || ''}
+                  onChange={(e) => setProfile(prev => prev ? { ...prev, first_name: e.target.value } : null)}
                 />
               </div>
             </div>
 
+            {/* Last Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Last Name</label>
+              <div className="mt-1 flex items-center">
+                <User className="h-5 w-5 text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  value={profile?.last_name || ''}
+                  onChange={(e) => setProfile(prev => prev ? { ...prev, last_name: e.target.value } : null)}
+                />
+              </div>
+            </div>
+
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Email</label>
               <div className="mt-1 flex items-center">
@@ -192,6 +176,7 @@ export default function MyProfile() {
               </div>
             </div>
 
+            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Phone</label>
               <div className="mt-1 flex items-center">
@@ -201,33 +186,36 @@ export default function MyProfile() {
                   className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   value={profile?.phone || ''}
                   onChange={(e) => setProfile(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                  placeholder="+1234567890"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
+            {/* Role */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Role</label>
               <div className="mt-1 flex items-center">
                 <Shield className="h-5 w-5 text-gray-400 mr-2" />
                 <input
                   type="text"
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={profile?.is_staff ? 'Admin Operator' : profile?.operator_id ? `Operator (Priority ${profile.operator_priority})` : 'Viewer'}
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50"
+                  value={profile?.is_staff ? 'Admin' : profile?.operator_id ? `Operator (Priority ${profile.operator_priority})` : 'Viewer'}
                   disabled
                 />
               </div>
             </div>
 
+            {/* Join Date */}
             <div>
               <label className="block text-sm font-medium text-gray-700">Join Date</label>
               <div className="mt-1 flex items-center">
                 <Calendar className="h-5 w-5 text-gray-400 mr-2" />
                 <input
                   type="text"
-                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  value={profile?.join_date || 'N/A'}
+                  className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md bg-gray-50"
+                  value={profile?.join_date ? new Date(profile.join_date).toLocaleDateString() : 'N/A'}
                   disabled
                 />
               </div>

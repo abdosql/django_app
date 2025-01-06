@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Thermometer, Clock, Bell, Shield } from 'lucide-react';
 import FlashMessage from '../components/FlashMessage';
+import { apiService } from '../services/api.service';
 
 interface SystemSettings {
   normal_temp_min: number;
@@ -34,20 +35,13 @@ export default function SystemSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
-        const response = await fetch('/api/settings/', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch settings');
+        const response = await apiService.getSettings();
+        if (response.error) {
+          throw new Error(response.error);
         }
-
-        const data = await response.json();
-        setSettings(data);
+        if (response.data) {
+          setSettings(response.data);
+        }
       } catch (error) {
         console.error('Failed to fetch settings:', error);
         setFlash({
@@ -65,26 +59,17 @@ export default function SystemSettings() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch('/api/settings/', {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update settings');
+      const response = await apiService.updateSettings(settings);
+      if (response.error) {
+        throw new Error(response.error);
       }
-
-      const updatedSettings = await response.json();
-      setSettings(updatedSettings);
-      setFlash({
-        type: 'success',
-        message: 'Settings updated successfully'
-      });
+      if (response.data) {
+        setSettings(response.data);
+        setFlash({
+          type: 'success',
+          message: 'Settings updated successfully'
+        });
+      }
     } catch (error) {
       console.error('Failed to update settings:', error);
       setFlash({

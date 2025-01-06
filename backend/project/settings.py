@@ -26,17 +26,13 @@ SECRET_KEY = "django-insecure-k!tojk-x8a#xp@&t86w*er1txq4x6bjgxl1pn0vy6ea3i%-c2#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'temp_monitor_backend', '192.168.8.155', '54.37.66.72']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'backend', 'temp_monitor_backend', '192.168.8.155', '54.37.66.72', 'temp_monitor_backend:8000']
+
+# CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://10.0.2.2:8000",
-    "http://localhost:19006",
-    "http://192.168.8.155:8000",
-    "http://192.168.8.155:3000",
+    "http://localhost:3000",
 ]
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = True  # En développement seulement
-
 
 # Application definition
 
@@ -67,46 +63,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
 
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
-
-CORS_EXPOSE_HEADERS = [
-    'content-type',
-    'content-length',
-]
-
-# Ajoutez ces origines supplémentaires
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://10.0.2.2:8000",
-    "http://localhost:19006",
-    "http://localhost:3000",
-    "exp://localhost:19000",
-]
 ROOT_URLCONF = "project.urls"
 
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            os.path.join(BASE_DIR, 'notifications/templates'),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -138,11 +103,11 @@ DATABASES = {
 
 # Add email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'seqqal.abdelaziz@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'fbpsdnxqaxyjmkqk')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Add telegram settings

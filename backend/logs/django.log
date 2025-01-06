@@ -1,0 +1,41 @@
+INFO 2025-01-06 15:28:10,388 autoreload 37 140396080139136 Watching for file changes with StatReloader
+INFO 2025-01-06 15:28:12,931 basehttp 37 140395874879168 "OPTIONS /api/settings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,931 basehttp 37 140395853907648 "OPTIONS /api/settings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,932 basehttp 37 140395885364928 "OPTIONS /api/notifications/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,933 basehttp 37 140395895850688 "OPTIONS /api/notifications/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,933 basehttp 37 140395864393408 "OPTIONS /api/monitoring/temperature/stats/?period=24h HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,934 basehttp 37 140395767924416 "OPTIONS /api/monitoring/alerts/active/?page=1&limit=10 HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,938 basehttp 37 140395874879168 "OPTIONS /api/notifications/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,942 basehttp 37 140395853907648 "OPTIONS /api/monitoring/readings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,943 basehttp 37 140395885364928 "OPTIONS /api/settings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,950 basehttp 37 140395895850688 "OPTIONS /api/notifications/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,954 basehttp 37 140395864393408 "OPTIONS /api/monitoring/temperature/stats/?period=24h HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,958 basehttp 37 140395767924416 "OPTIONS /api/settings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,960 basehttp 37 140395874879168 "OPTIONS /api/monitoring/alerts/active/?page=1&limit=10 HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:12,964 basehttp 37 140395853907648 "OPTIONS /api/monitoring/readings/ HTTP/1.1" 200 0
+INFO 2025-01-06 15:28:13,017 basehttp 37 140395864393408 "GET /api/settings/ HTTP/1.1" 200 200
+INFO 2025-01-06 15:28:13,021 basehttp 37 140395885364928 "GET /api/settings/ HTTP/1.1" 200 200
+INFO 2025-01-06 15:28:13,039 basehttp 37 140395767924416 "GET /api/monitoring/temperature/stats/?period=24h HTTP/1.1" 200 8666
+INFO 2025-01-06 15:28:13,075 basehttp 37 140395767924416 "GET /api/settings/ HTTP/1.1" 200 200
+INFO 2025-01-06 15:28:13,686 basehttp 37 140395853907648 "GET /api/monitoring/alerts/active/?page=1&limit=10 HTTP/1.1" 200 6663
+INFO 2025-01-06 15:28:13,875 basehttp 37 140395853907648 "GET /api/monitoring/temperature/stats/?period=24h HTTP/1.1" 200 8666
+INFO 2025-01-06 15:28:13,918 basehttp 37 140395853907648 "GET /api/settings/ HTTP/1.1" 200 200
+INFO 2025-01-06 15:28:14,223 basehttp 37 140395895850688 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:14,626 basehttp 37 140395853907648 "GET /api/monitoring/alerts/active/?page=1&limit=10 HTTP/1.1" 200 6663
+INFO 2025-01-06 15:28:14,633 basehttp 37 140395864393408 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:14,668 basehttp 37 140395767924416 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:14,830 basehttp 37 140395874879168 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:21,058 basehttp 37 140395885364928 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:21,137 basehttp 37 140395895850688 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:34,931 basehttp 37 140395895850688 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:36,329 basehttp 37 140395885364928 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:43,572 basehttp 37 140395895850688 "GET /api/monitoring/alerts/active/?page=1&limit=10 HTTP/1.1" 200 6663
+INFO 2025-01-06 15:28:43,641 basehttp 37 140395885364928 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:43,830 basehttp 37 140395895850688 "GET /api/notifications/ HTTP/1.1" 200 28451
+INFO 2025-01-06 15:28:47,073 autoreload 37 140396080139136 /app/project/settings.py changed, reloading.
+INFO 2025-01-06 15:28:51,632 autoreload 45 140063064685440 Watching for file changes with StatReloader
+INFO 2025-01-06 15:28:54,990 basehttp 45 140062954096320 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:56,467 basehttp 45 140062840850112 "GET /api/monitoring/readings/ HTTP/1.1" 200 4542712
+INFO 2025-01-06 15:28:57,478 autoreload 45 140063064685440 /app/project/settings.py changed, reloading.
+INFO 2025-01-06 15:28:58,961 autoreload 49 140436496243584 Watching for file changes with StatReloader
+INFO 2025-01-06 15:30:03,632 autoreload 49 140436496243584 /app/project/settings.py changed, reloading.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiService } from '../services/api.service';
 
 interface SystemSettings {
   normal_temp_min: number;
@@ -26,20 +27,11 @@ export function useSystemSettings() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
-        const response = await fetch('/api/settings/', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch settings');
+        const response = await apiService.request<SystemSettings>('/settings/');
+        if (response.error) {
+          throw new Error(response.error);
         }
-
-        const data = await response.json();
-        setSettings(data);
+        setSettings(response.data || settings);
       } catch (err) {
         console.error('Error fetching settings:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch settings');
@@ -52,4 +44,4 @@ export function useSystemSettings() {
   }, []);
 
   return { settings, isLoading, error };
-} 
+}

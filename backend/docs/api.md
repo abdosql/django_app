@@ -148,6 +148,7 @@
     }
 }
 ```
+
 ### Notifications
 #### List Notifications
 - **Endpoint**: `/api/notifications/`
@@ -224,7 +225,6 @@ When an alert is created (based on readings), the system will:
 - `SENT`: Successfully delivered through at least one channel
 - `FAILED`: Failed to deliver through any channel
 - `READ`: Operator has marked the notification as read
-
 
 #### Operator Actions
 
@@ -578,6 +578,78 @@ When an alert is created (based on readings), the system will:
 {
     "interval": 20,  // minutes
     "device_id": "FRIDGE_01"  // optional, applies to all devices if not specified
+}
+```
+
+## ESP8266 Data Collection
+#### Submit Reading
+- **Endpoint**: `/api/monitoring/esp/reading/`
+- **Method**: `POST`
+- **Authentication**: Not required
+- **Description**: Endpoint for ESP8266 to submit temperature and humidity readings
+- **Request Body**:
+```json
+{
+    "device_id": "esp8266_01",
+    "temperature": 23.5,
+    "humidity": 45.0,
+    "battery_level": 95
+}
+```
+- **Response**:
+```json
+{
+    "status": "success",
+    "reading_id": 123
+}
+```
+- **Error Responses**:
+  - 400: Invalid data format
+  - 429: Reading interval too short (< 20 minutes)
+  - 500: Server error
+
+## Data Export
+#### Export Readings to CSV
+- **Endpoint**: `/api/monitoring/readings/export/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Description**: Export temperature readings to CSV file
+- **Query Parameters**:
+  - `start_date`: Start date (YYYY-MM-DD)
+  - `end_date`: End date (YYYY-MM-DD)
+  - `device_id`: Filter by specific device (optional)
+- **Response**: CSV file with headers:
+  - Timestamp
+  - Device ID
+  - Temperature (°C)
+  - Humidity (%)
+  - Power Status
+  - Battery Level (%)
+  - Alert Status
+
+## Temperature Statistics
+#### Get Temperature Stats
+- **Endpoint**: `/api/monitoring/temperature/stats/`
+- **Method**: `GET`
+- **Authentication**: Required
+- **Description**: Get temperature statistics for different time periods
+- **Query Parameters**:
+  - `period`: Time period ('24h', '7d', '30d')
+  - `start_date`: Optional start date filter
+  - `end_date`: Optional end date filter
+- **Response**:
+```json
+{
+    "period": "24h",
+    "statistics": [
+        {
+            "date": "2024-01-01",
+            "min_temperature": 2.5,
+            "max_temperature": 7.8,
+            "average_temperature": 5.2,
+            "alert_count": 0
+        }
+    ]
 }
 ```
 

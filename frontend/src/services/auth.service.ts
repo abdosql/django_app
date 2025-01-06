@@ -18,7 +18,7 @@ class AuthService {
   private tokenCheckInterval: number | null = null;
 
   constructor() {
-    this.baseUrl = '/api';
+    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
   }
 
   async login(credentials: LoginCredentials): Promise<LoginResponse> {

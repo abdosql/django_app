@@ -2,40 +2,66 @@
 <html>
 <head>
     <style>
-        .alert-container {
-            padding: 20px;
+        body {
             font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
         }
-        .alert-header {
+        .header {
             background-color: #f8d7da;
             color: #721c24;
-            padding: 10px;
+            padding: 15px;
             border-radius: 5px;
+            margin-bottom: 20px;
         }
-        .alert-body {
+        .content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .footer {
             margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+            color: #666;
         }
     </style>
 </head>
 <body>
-    <div class="alert-container">
-        <div class="alert-header">
-            <h2>Alert Notification</h2>
-        </div>
-        <div class="alert-body">
-            {% if alert %}
-                <p><strong>Type:</strong> {{ alert.get_type_display }}</p>
-                <p><strong>Severity:</strong> {{ alert.get_severity_display }}</p>
-                <p><strong>Message:</strong> {{ alert.message }}</p>
-                <p><strong>Time:</strong> {{ alert.timestamp|date:"Y-m-d H:i:s" }}</p>
-            {% else %}
-                <p>{{ message }}</p>
-            {% endif %}
-            
-            <hr>
-            <p><strong>Operator:</strong> {{ operator.name }}</p>
-            <p><strong>Priority:</strong> {{ operator.get_priority_display }}</p>
-        </div>
+    <div class="header">
+        <h2>Temperature Monitor Alert</h2>
+    </div>
+    
+    <div class="content">
+        {% if alert %}
+            <h3>Alert Details</h3>
+            <p><strong>Type:</strong> {{ alert.get_type_display }}</p>
+            <p><strong>Severity:</strong> {{ alert.get_severity_display }}</p>
+            <p><strong>Time:</strong> {{ alert.timestamp|date:"Y-m-d H:i:s" }}</p>
+            <p><strong>Message:</strong> {{ alert.message }}</p>
+        {% endif %}
+
+        {% if incident %}
+            <h3>Incident Details</h3>
+            <p><strong>Description:</strong> {{ incident.description }}</p>
+            <p><strong>Status:</strong> {{ incident.get_status_display }}</p>
+            <p><strong>Start Time:</strong> {{ incident.start_time|date:"Y-m-d H:i:s" }}</p>
+            <p><strong>Alert Count:</strong> {{ incident.alert_count }}</p>
+        {% endif %}
+
+        {% if not alert and not incident %}
+            <p>{{ message }}</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <p>This is an automated message from the Temperature Monitoring System.</p>
+        <p>Operator: {{ operator.name }} (Priority: {{ operator.get_priority_display }})</p>
     </div>
 </body>
 </html> 

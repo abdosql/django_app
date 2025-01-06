@@ -139,4 +139,66 @@ Time: {alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}
 
 Operator: {operator.name}
 Priority: {operator.get_priority_display()}
+        """
+
+    def notify_operator(self, operator, incident, message):
+        """
+        Send a notification to a single operator about an incident
+        Args:
+            operator: The Operator model instance to notify
+            incident: The Incident model instance related to the notification
+            message: The message to send to the operator
+        Returns:
+            bool: True if notification was successful
+        """
+        try:
+            # Create notification record first
+            notification = Notification.objects.create(
+                operator=operator,
+                incident=incident,
+                message=message,
+                notification_type='EMAIL',
+                status='PENDING'
+            )
+            
+            # Send email
+            email_success = self.email_service.send_email(
+                operator=operator,
+                subject=f"Incident Alert: {incident.description}",
+                message=self._format_incident_message(incident, operator, message),
+                incident=incident
+            )
+            
+            if email_success:
+                notification.status = 'SENT'
+                notification.sent_at = timezone.now()
+                notification.save()
+                return True
+            else:
+                notification.status = 'FAILED'
+                notification.retry_count = 1
+                notification.save()
+                return False
+            
+        except Exception as e:
+            logger.error(f"Failed to notify operator {operator.id}: {str(e)}")
+            return False
+            
+    def _format_incident_message(self, incident, operator, message):
+        """Format an incident notification message"""
+        return f"""
+🚨 *Incident Alert*
+Description: {incident.description}
+Status: {incident.get_status_display()}
+Alert Count: {incident.alert_count}
+Escalation Level: {incident.current_escalation_level}
+
+Message: {message}
+
+Device: {incident.device.name}
+Location: {incident.device.location}
+Time: {incident.start_time.strftime('%Y-%m-%d %H:%M:%S')}
+
+Operator: {operator.name}
+Priority: {operator.get_priority_display()}
         """ 

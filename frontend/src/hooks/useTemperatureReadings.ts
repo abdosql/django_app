@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiService } from '../services/api.service';
 
 interface TemperatureReading {
   temperature: number;
@@ -25,52 +26,47 @@ export function useTemperatureReadings() {
   // Function to fetch initial readings
   const fetchReadings = useCallback(async () => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch('/api/readings/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch readings');
-      }
-
-      const data = await response.json();
+      setIsLoading(true);
+      setError(null);
+      const response = await apiService.getLatestReadings();
       
-      if (data.length > 0) {
-        const latestReading = data[0];
-        const previousReading = data[1];
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      const readings = response.data as TemperatureReading[];
+      if (readings && readings.length > 0) {
+        const latestReading = readings[0];
+        const previousReading = readings[1];
         
         setCurrentReading(latestReading);
         
         // Calculate max and min temperatures from last 24 hours
-        const last24Hours = data.filter((reading: TemperatureReading) => {
+        const last24Hours = readings.filter((reading: TemperatureReading) => {
           const readingTime = new Date(reading.timestamp);
           const dayAgo = new Date();
           dayAgo.setHours(dayAgo.getHours() - 24);
           return readingTime >= dayAgo;
         });
-        
+
         const temperatures = last24Hours.map((r: TemperatureReading) => r.temperature);
-        setMaxTemp(Math.max(...temperatures));
-        setMinTemp(Math.min(...temperatures));
+        if (temperatures.length > 0) {
+          setMaxTemp(Math.max(...temperatures));
+          setMinTemp(Math.min(...temperatures));
+        }
         
-        // Determine trend
+        // Calculate trend
         if (previousReading) {
-          if (latestReading.temperature > previousReading.temperature) {
-            setTrend('up');
-          } else if (latestReading.temperature < previousReading.temperature) {
-            setTrend('down');
-          } else {
+          const diff = latestReading.temperature - previousReading.temperature;
+          if (Math.abs(diff) < 0.5) {
             setTrend('stable');
+          } else {
+            setTrend(diff > 0 ? 'up' : 'down');
           }
         }
       }
     } catch (err) {
-      console.error('Error fetching readings:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch readings');
+      setError(err instanceof Error ? err.message : 'An error occurred while fetching readings');
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +161,7 @@ export function useTemperatureReadings() {
     error,
     humidity: currentReading?.humidity ?? 0,
     powerStatus: currentReading?.power_status ?? false,
-    batteryLevel: currentReading?.battery_level ?? 0
+    batteryLevel: currentReading?.battery_level ?? 0,
+    refetch: fetchReadings
   };
-} 
+}

@@ -24,7 +24,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/token/', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${apiUrl}/auth/token/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,7 +68,7 @@ export default function LoginPage() {
       navigate(from, { replace: true });
 
       // Fetch full user profile
-      const profileResponse = await fetch(`/api/auth/users/${data.user_id}/`, {
+      const profileResponse = await fetch(`${apiUrl}/auth/users/${data.user_id}/`, {
         headers: {
           'Authorization': `Bearer ${data.access}`,
           'Content-Type': 'application/json',
@@ -223,4 +224,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-} 
+}

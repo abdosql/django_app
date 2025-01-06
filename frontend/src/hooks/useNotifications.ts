@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiService } from '../services/api.service';
 
 interface Operator {
   id: number;
@@ -6,11 +7,19 @@ interface Operator {
   priority: string;
 }
 
+interface Device {
+  id: number;
+  name: string;
+  location: string;
+}
+
 interface Alert {
   id: number;
   type: string;
   severity: string;
   message: string;
+  temperature: number;
+  device: Device;
 }
 
 export interface Notification {
@@ -33,94 +42,47 @@ export function useNotifications() {
 
   const fetchNotifications = async () => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch('/api/notifications/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch notifications');
+      const response = await apiService.getNotifications();
+      if (response.error) {
+        throw new Error(response.error);
       }
-
-      const data = await response.json();
-      setNotifications(data);
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
-    }
-  };
-
-  const fetchUnreadCount = async () => {
-    try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch('/api/notifications/unread_count/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch unread count');
-      }
-
-      const data = await response.json();
-      setUnreadCount(data.count);
-    } catch (err) {
-      console.error('Error fetching unread count:', err);
-    }
-  };
-
-  const markAsRead = async (notificationId: number) => {
-    try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(`/api/notifications/${notificationId}/read/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to mark notification as read');
-      }
-
-      // Update local state
-      await Promise.all([fetchNotifications(), fetchUnreadCount()]);
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-      throw err;
-    }
-  };
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([fetchNotifications(), fetchUnreadCount()]);
+      setNotifications(response.data || []);
+      setUnreadCount((response.data || []).filter(n => n.status === 'PENDING').length);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch notifications';
+      console.error('Error fetching notifications:', errorMessage);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
+  const markAsRead = async (notificationId: number) => {
+    try {
+      const response = await apiService.markNotificationAsRead(notificationId);
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      // Update local state
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, status: 'READ' as const } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to mark notification as read';
+      console.error('Error marking notification as read:', errorMessage);
+      setError(errorMessage);
+    }
+  };
 
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchData, 30000);
+  useEffect(() => {
+    fetchNotifications();
+
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
-  return {
-    notifications,
-    unreadCount,
-    isLoading,
-    error,
-    markAsRead,
-    refresh: fetchData
-  };
-} 
+  return { notifications, unreadCount, isLoading, error, markAsRead };
+}

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { apiService } from '../services/api.service';
 
 interface Reading {
   temperature: number;
@@ -6,58 +7,57 @@ interface Reading {
   timestamp: string;
 }
 
-export function useHistoricalReadings(timeRange: '24h' | '7d' | '30d') {
+interface TemperatureStats {
+  readings: Reading[];
+  average_temperature: number;
+  max_temperature: number;
+  min_temperature: number;
+}
+
+export function useHistoricalReadings(timeRange: '24h' | '7d' | '30d' | 'custom', customStartDate?: string, customEndDate?: string) {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchHistoricalData = async () => {
-      try {
-        setIsLoading(true);
-        const token = sessionStorage.getItem('access_token');
-        
-        // Calculate the start date based on the time range
-        const now = new Date();
-        const startDate = new Date(now);
-        switch (timeRange) {
-          case '24h':
-            startDate.setHours(startDate.getHours() - 24);
-            break;
-          case '7d':
-            startDate.setDate(startDate.getDate() - 7);
-            break;
-          case '30d':
-            startDate.setDate(startDate.getDate() - 30);
-            break;
-        }
-
-        const response = await fetch(
-          `/api/readings/?start_date=${startDate.toISOString()}&end_date=${now.toISOString()}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            }
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch historical data');
-        }
-
-        const data = await response.json();
-        setReadings(data);
-      } catch (err) {
-        console.error('Error fetching historical data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch historical data');
-      } finally {
-        setIsLoading(false);
+  const fetchHistoricalData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      let response;
+      if (timeRange === 'custom' && customStartDate && customEndDate) {
+        response = await apiService.getCustomTemperatureStats(customStartDate, customEndDate);
+      } else {
+        response = await apiService.getTemperatureStats(timeRange);
       }
-    };
 
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      const stats = response.data;
+      if (!stats || !stats.readings) {
+        throw new Error('Invalid response format');
+      }
+
+      // Sort readings by timestamp in ascending order
+      const sortedReadings = [...stats.readings].sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      
+      setReadings(sortedReadings);
+    } catch (err) {
+      console.error('Error fetching historical data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch historical data');
+      setReadings([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [timeRange, customStartDate, customEndDate]);
+
+  useEffect(() => {
     fetchHistoricalData();
-  }, [timeRange]);
+  }, [fetchHistoricalData]);
 
-  return { readings, isLoading, error };
-} 
+  return { readings, isLoading, error, refetch: fetchHistoricalData };
+}

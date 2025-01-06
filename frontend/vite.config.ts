@@ -14,18 +14,6 @@ export default defineConfig({
     hmr: {
       host: 'localhost',
       clientPort: 3000,
-    },
-    proxy: {
-      '/api': {
-        target: 'http://backend:8000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path,
-        headers: {
-          'Host': 'backend',
-          'Origin': 'http://frontend:3000'
-        },
-      },
-    },
+    }
   },
 });
