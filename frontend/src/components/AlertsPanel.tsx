@@ -1,28 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Bell, CheckCircle, Clock } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { apiService } from '../services/api.service';
 import { useAlerts } from '../hooks/useAlerts';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 interface Alert {
   id: number;
-  type: string;
-  severity: 'warning' | 'critical';
+  alert_type: string;
+  type_display: string;
+  severity: 'warning' | 'critical' | 'severe';
+  severity_display: string;
   message: string;
   timestamp: string;
   device: {
-    id: number;
+    device_id: string;
     name: string;
     location: string;
+    status: string;
   };
-  consecutiveCount: number;
-  temperature?: number;
-  is_resolved: boolean;
+  temperature: number;
+  consecutive_count: number;
+  resolved: boolean;
+  resolved_at: string | null;
 }
 
-export default function AlertsPanel() {
+interface AlertsPanelProps {
+  deviceId?: string;
+}
+
+export default function AlertsPanel({ deviceId }: AlertsPanelProps) {
   const navigate = useNavigate();
   const { alerts, isLoading, error, hasMore, loadMore, totalCount } = useAlerts(10);
   const [errorState, setErrorState] = useState<string | null>(null);
@@ -45,43 +54,36 @@ export default function AlertsPanel() {
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case 'severe': return 'bg-red-50 border-red-200 text-red-700';
-      case 'critical': return 'bg-orange-50 border-orange-200 text-orange-700';
-      case 'normal': return 'bg-green-50 border-green-200 text-green-700';
-      default: return 'bg-gray-50 border-gray-200 text-gray-700';
+  const getAlertSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'severe': return 'border-l-4 border-l-red-500 bg-white';
+      case 'critical': return 'border-l-4 border-l-orange-500 bg-white';
+      case 'warning': return 'border-l-4 border-l-yellow-500 bg-white';
+      default: return 'border-l-4 border-l-gray-500 bg-white';
     }
   };
 
-  const TemperatureThresholdIndicator = ({ temperature }: { temperature: number }) => {
-    const getThresholdColor = (temp: number) => {
-      if (temp < 0 || temp > 10) return 'bg-red-500';
-      if (temp < 2 || temp > 8) return 'bg-orange-500';
-      return 'bg-green-500';
-    };
+  const getAlertIcon = (severity: string) => {
+    switch (severity) {
+      case 'severe':
+        return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'critical':
+        return <AlertTriangle className="h-5 w-5 text-orange-500" />;
+      case 'warning':
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      default:
+        return <AlertTriangle className="h-5 w-5 text-gray-500" />;
+    }
+  };
 
-    const getThresholdText = (temp: number) => {
-      if (temp < 0 || temp > 10) return 'Severe';
-      if (temp < 2 || temp > 8) return 'Critical';
-      return 'Normal';
-    };
-
-    return (
-      <div className="flex items-center space-x-2 mt-1">
-        <div className={`h-2 w-2 rounded-full ${getThresholdColor(temperature)}`} />
-        <span className="text-sm font-medium">
-          {temperature.toFixed(1)}°C
-        </span>
-        <span className={`text-sm ${
-          temperature < 0 || temperature > 10 ? 'text-red-600' :
-          temperature < 2 || temperature > 8 ? 'text-orange-600' :
-          'text-gray-600'
-        }`}>
-          ({getThresholdText(temperature)})
-        </span>
-      </div>
-    );
+  const getTemperatureStatus = (temp: number) => {
+    if (temp < 0 || temp > 10) {
+      return { text: 'Severe', color: 'text-red-600', bgColor: 'bg-red-50' };
+    } else if (temp < 2 || temp > 8) {
+      return { text: 'Critical', color: 'text-orange-600', bgColor: 'bg-orange-50' };
+    } else {
+      return { text: 'Normal', color: 'text-green-600', bgColor: 'bg-green-50' };
+    }
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -106,19 +108,48 @@ export default function AlertsPanel() {
 
   const handleCreateIncident = async (alert: Alert) => {
     try {
-      const response = await apiService.createIncident({
-        alert_id: alert.id,
-        description: `Incident created from ${alert.type} alert: ${alert.message}`,
-        device_id: alert.device.id.toString(),
-      });
+      toast.info('Creating incident...', { autoClose: 2000 });
       
-      if (response.error) throw new Error(response.error);
+      console.log('Alert object:', alert);
       
-      navigate(`/incidents/${response.data.id}`);
-    } catch (error) {
-      if (error instanceof Error) {
-        setErrorState(error.message);
+      if (!alert.device || !alert.device.device_id) {
+        const errorMsg = 'Invalid alert data: device information is missing';
+        console.error(errorMsg);
+        toast.error(errorMsg);
+        return;
       }
+      
+      console.log('Alert device:', alert.device);
+      
+      // Log the data we're sending
+      const incidentData = {
+        alert: alert.id,
+        device_id: alert.device.device_id,  // Use device_id directly as it's already a string
+        description: `Temperature ${alert.severity_display} incident: ${alert.temperature}°C`,
+        status: 'open',
+        alert_count: alert.consecutive_count || 1,
+        current_escalation_level: alert.consecutive_count >= 7 ? 3 : 
+                                 alert.consecutive_count >= 4 ? 2 : 1,
+        start_time: new Date().toISOString()
+      };
+      
+      console.log('Creating incident with data:', incidentData);
+      
+      const response = await apiService.createIncident(incidentData);
+      
+      if (response.error) {
+        console.error('Incident creation error:', response.error);
+        toast.error(`Failed to create incident: ${response.error}`);
+        throw new Error(response.error);
+      }
+      
+      toast.success('Incident created successfully');
+      navigate(`/incidents/${response.data.id}`);
+    } catch (err) {
+      console.error('Error creating incident:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create incident';
+      toast.error(errorMessage);
+      setErrorState(errorMessage);
     }
   };
 
@@ -140,116 +171,170 @@ export default function AlertsPanel() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="text-red-500">
-          <AlertTriangle className="h-6 w-6 mb-2" />
-          <p>Error loading alerts</p>
-          <p className="text-sm">{error}</p>
+  return (
+    <div className="bg-white shadow-sm rounded-lg flex flex-col h-[calc(100vh-6rem)] overflow-hidden">
+      {/* Fixed Header */}
+      <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0 bg-white sticky top-0 z-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Temperature Alerts</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Monitoring temperature anomalies and notifications
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Bell className="h-5 w-5 text-gray-500" />
+              {totalCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
+                  {totalCount}
+                </span>
+              )}
+            </div>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="p-1.5 hover:bg-gray-50 rounded-md transition-colors"
+              title="Refresh alerts"
+            >
+              <RefreshCw className="h-4 w-4 text-gray-500" />
+            </button>
+          </div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Temperature Alerts</h2>
-        <div className="relative">
-          <Bell className="h-6 w-6 text-indigo-500" />
-          {totalCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
-              {totalCount}
-            </span>
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#E5E7EB_transparent] [&::-webkit-scrollbar]:w-[6px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-gray-200 [&::-webkit-scrollbar-thumb]:rounded-md hover:[&::-webkit-scrollbar-thumb]:bg-gray-300">
+        <div className="divide-y divide-gray-100">
+          {alerts.length === 0 ? (
+            <div className="p-6 text-center">
+              <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+              <p className="text-base font-medium text-gray-900">No Active Alerts</p>
+              <p className="text-sm text-gray-500">
+                All systems are operating within normal parameters
+              </p>
+            </div>
+          ) : (
+            <>
+              {alerts.map(alert => {
+                const tempStatus = getTemperatureStatus(alert.temperature);
+                return (
+                  <div 
+                    key={alert.id}
+                    className={`${getAlertSeverityColor(alert.severity)} hover:bg-gray-50 group`}
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-1">
+                          {getAlertIcon(alert.severity)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium text-gray-900">
+                              {alert.type_display}
+                            </h3>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tempStatus.bgColor} ${tempStatus.color}`}>
+                              {tempStatus.text}
+                            </span>
+                          </div>
+                          
+                          <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <p className="text-xs font-medium text-gray-500">Device</p>
+                              <p className="text-sm text-gray-900">{alert.device.name}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500">Location</p>
+                              <p className="text-sm text-gray-900">{alert.device.location}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500">Temperature</p>
+                              <p className="text-sm text-gray-900 font-medium">{alert.temperature.toFixed(1)}°C</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-gray-500">Consecutive Alerts</p>
+                              <p className="text-sm text-gray-900">{alert.consecutive_count}</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex items-center text-xs text-gray-500">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {formatTimestamp(alert.timestamp)}
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-end space-x-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleAcknowledge(alert.id);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium text-gray-700 hover:text-gray-900 
+                                       bg-white hover:bg-gray-50 border border-gray-200 rounded 
+                                       transition-colors shadow-sm"
+                            >
+                              Acknowledge
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleCreateIncident(alert);
+                              }}
+                              className="px-2.5 py-1 text-xs font-medium text-white 
+                                       bg-indigo-600 hover:bg-indigo-700 rounded 
+                                       transition-colors shadow-sm"
+                            >
+                              Create Incident
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {hasMore && (
+                <div ref={observerTarget} className="p-4 text-center">
+                  {isLoading && (
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-2 border-indigo-500 border-t-transparent"></div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
 
-      <div className="space-y-3 max-h-[600px] overflow-y-auto">
-        {alerts.length === 0 ? (
-          <div className="text-center py-8">
-            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-            <p className="text-gray-600 font-medium">No Active Alerts</p>
-            <p className="text-sm text-gray-500 mt-1">
-              All systems are operating within normal parameters
-            </p>
-          </div>
-        ) : (
-          <>
-            {alerts.map(alert => (
-              <Link 
-                to={`/incidents/${alert.id}`}
-                key={alert.id}
-                className={`p-4 rounded-lg border ${getAlertColor(alert.type)} hover:opacity-90 transition-opacity`}
-              >
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 mr-2 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium">
-                      {alert.type === 'high_temperature' ? 'Temperature High Alert' : 
-                       alert.type === 'low_temperature' ? 'Temperature Low Alert' : 
-                       'Temperature Alert'}
-                    </p>
-                    {alert.temperature && (
-                      <TemperatureThresholdIndicator temperature={alert.temperature} />
-                    )}
-                    <p className="text-sm mt-1">
-                      Consecutive alerts: {alert.consecutiveCount}
-                      {alert.consecutiveCount >= 7 && ' - All operators notified'}
-                      {alert.consecutiveCount >= 4 && alert.consecutiveCount < 7 && ' - Operators 1 & 2 notified'}
-                      {alert.consecutiveCount < 4 && ' - Operator 1 notified'}
-                    </p>
-                    <div className="flex items-center text-sm mt-1 opacity-75">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {formatTimestamp(alert.timestamp)}
-                    </div>
-                    <div className="mt-3 flex justify-end space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleAcknowledge(alert.id);
-                        }}
-                        className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        Acknowledge
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleCreateIncident(alert);
-                        }}
-                        className="px-2 py-1 text-sm text-indigo-600 hover:text-indigo-900"
-                      >
-                        Create Incident
-                      </button>
-                    </div>
+      {/* Fixed Footer */}
+      {alerts.length > 0 && (
+        <div className="px-4 py-2.5 bg-white border-t border-gray-100 flex-shrink-0 sticky bottom-0 z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600">Active Alerts:</span>
+                <span className="text-xs font-semibold text-gray-900">{totalCount}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                    <span className="text-xs text-gray-600">Severe</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-orange-500"></div>
+                    <span className="text-xs text-gray-600">Critical</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                    <span className="text-xs text-gray-600">Warning</span>
                   </div>
                 </div>
-              </Link>
-            ))}
-            {hasMore && (
-              <div ref={observerTarget} className="py-4">
-                {isLoading && (
-                  <div className="text-center">
-                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-indigo-500 border-t-transparent"></div>
-                  </div>
-                )}
               </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {alerts.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <div className="flex justify-between text-sm text-gray-500">
-            <span>Active Alerts: {totalCount}</span>
+            </div>
             <button 
-              className="text-indigo-600 hover:text-indigo-800 font-medium"
-              onClick={() => window.location.href = '/alerts'}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              onClick={() => navigate('/alerts')}
             >
-              View All
+              View All Alerts
             </button>
           </div>
         </div>

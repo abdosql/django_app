@@ -81,6 +81,14 @@ export default function SystemSettings() {
     }
   };
 
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>, field: keyof SystemSettings) => {
+    const value = parseFloat(e.target.value);
+    setSettings(prev => ({
+      ...prev,
+      [field]: isNaN(value) ? 0 : value
+    }));
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm">
       {flash && (
@@ -110,8 +118,8 @@ export default function SystemSettings() {
                     type="number"
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                     placeholder="Min (°C)"
-                    value={settings.normal_temp_min}
-                    onChange={(e) => setSettings({ ...settings, normal_temp_min: parseFloat(e.target.value) })}
+                    value={settings.normal_temp_min || ''}
+                    onChange={(e) => handleNumberChange(e, 'normal_temp_min')}
                   />
                 </div>
                 <div className="flex items-center">
@@ -120,8 +128,8 @@ export default function SystemSettings() {
                     type="number"
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                     placeholder="Max (°C)"
-                    value={settings.normal_temp_max}
-                    onChange={(e) => setSettings({ ...settings, normal_temp_max: parseFloat(e.target.value) })}
+                    value={settings.normal_temp_max || ''}
+                    onChange={(e) => handleNumberChange(e, 'normal_temp_max')}
                   />
                 </div>
               </div>
@@ -136,8 +144,8 @@ export default function SystemSettings() {
                     type="number"
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                     placeholder="Min (°C)"
-                    value={settings.critical_temp_min}
-                    onChange={(e) => setSettings({ ...settings, critical_temp_min: parseFloat(e.target.value) })}
+                    value={settings.critical_temp_min || ''}
+                    onChange={(e) => handleNumberChange(e, 'critical_temp_min')}
                   />
                 </div>
                 <div className="flex items-center">
@@ -146,8 +154,8 @@ export default function SystemSettings() {
                     type="number"
                     className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
                     placeholder="Max (°C)"
-                    value={settings.critical_temp_max}
-                    onChange={(e) => setSettings({ ...settings, critical_temp_max: parseFloat(e.target.value) })}
+                    value={settings.critical_temp_max || ''}
+                    onChange={(e) => handleNumberChange(e, 'critical_temp_max')}
                   />
                 </div>
               </div>

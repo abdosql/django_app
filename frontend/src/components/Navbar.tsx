@@ -15,6 +15,7 @@ const baseNavigation = [
 
 const adminNavigation = [
   { name: 'Devices', href: '/devices', icon: HardDrive },
+  { name: 'Operators', href: '/operator-settings', icon: User },
   { name: 'Settings', href: '/system-settings', icon: Settings },
 ];
 

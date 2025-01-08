@@ -25,9 +25,60 @@ from reportlab.pdfgen import canvas
 logger = logging.getLogger(__name__)
 
 class ReadingViewSet(viewsets.ModelViewSet):
-    queryset = Reading.objects.all()
     serializer_class = ReadingSerializer
     notification_service = NotificationService()
+
+    def get_queryset(self):
+        queryset = Reading.objects.all()
+        device_id = self.request.query_params.get('device_id', None)
+        if device_id:
+            queryset = queryset.filter(device_id=device_id)
+        return queryset.order_by('-timestamp')
+
+    @action(detail=False, methods=['get'])
+    def latest(self, request):
+        """Get the latest temperature reading."""
+        try:
+            device_id = request.query_params.get('device_id', None)
+            queryset = self.get_queryset()
+            
+            if device_id and device_id != 'ALL':
+                queryset = queryset.filter(device_id=device_id)
+            
+            latest_reading = queryset.first()  # Already ordered by -timestamp from get_queryset
+            
+            if not latest_reading:
+                return Response({
+                    'error': 'No readings available'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get previous reading for trend
+            previous_reading = queryset[1] if queryset.count() > 1 else None
+            
+            # Calculate trend
+            trend = 'stable'
+            if previous_reading:
+                if latest_reading.temperature > previous_reading.temperature:
+                    trend = 'increasing'
+                elif latest_reading.temperature < previous_reading.temperature:
+                    trend = 'decreasing'
+            
+            response_data = {
+                'timestamp': latest_reading.timestamp,
+                'temperature': latest_reading.temperature,
+                'humidity': latest_reading.humidity,
+                'device_id': latest_reading.device_id,
+                'power_status': latest_reading.power_status,
+                'trend': trend
+            }
+            
+            return Response(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error getting latest reading: {str(e)}")
+            return Response({
+                'error': f'Failed to get latest reading: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _determine_severity(self, temperature):
         """
@@ -405,37 +456,92 @@ class IncidentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def acknowledge(self, request, pk=None):
-        incident = self.get_object()
-        operator = self._get_operator_or_fail()
-        
-        if incident.status == 'resolved':
+        try:
+            incident = self.get_object()
+            
+            try:
+                operator = self._get_operator_or_fail()
+            except PermissionDenied as e:
+                return Response(
+                    {'error': str(e)},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if incident.status == 'resolved':
+                return Response(
+                    {'error': 'Cannot acknowledge resolved incident'},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            
+            note = request.data.get('acknowledgment_note', '')
+            
+            with transaction.atomic():
+                # Update incident status
+                incident.status = 'acknowledged'
+                incident.acknowledged_by = operator
+                incident.acknowledged_at = timezone.now()
+                incident.save()
+                
+                # Create comment
+                IncidentComment.objects.create(
+                    incident=incident,
+                    operator=operator,
+                    comment=f"Incident acknowledged: {note}",
+                    action_taken=True
+                )
+                
+                # Create timeline event
+                IncidentTimelineEvent.objects.create(
+                    incident=incident,
+                    event_type='status_changed',
+                    description=f"Incident acknowledged by {operator.name}",
+                    operator=operator,
+                    metadata={
+                        'status': 'acknowledged',
+                        'note': note,
+                        'operator': operator.name
+                    }
+                )
+                
+                # Check if temperature is back to normal
+                try:
+                    latest_reading = incident.device.readings.order_by('-timestamp').first()
+                    if latest_reading and 2 <= latest_reading.temperature <= 8:
+                        # Temperature is back to normal, resolve the incident
+                        incident.status = 'resolved'
+                        incident.resolved_by = operator
+                        incident.resolved_at = timezone.now()
+                        incident.save()
+                        
+                        # Create resolution timeline event
+                        IncidentTimelineEvent.objects.create(
+                            incident=incident,
+                            event_type='status_changed',
+                            description=f"Incident automatically resolved - Temperature back to normal: {latest_reading.temperature}°C",
+                            operator=operator,
+                            metadata={
+                                'status': 'resolved',
+                                'temperature': latest_reading.temperature,
+                                'operator': operator.name
+                            }
+                        )
+                except Exception as e:
+                    logger.error(f"Error checking temperature for auto-resolution: {str(e)}")
+                    # Continue with acknowledgment even if temperature check fails
+                
+            return Response({
+                'status': incident.status,
+                'message': f'Incident {incident.status}',
+                'acknowledged_by': operator.name,
+                'acknowledged_at': incident.acknowledged_at
+            })
+            
+        except Exception as e:
+            logger.error(f"Error acknowledging incident: {str(e)}")
             return Response(
-                {'detail': 'Cannot acknowledge resolved incident'},
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                {'error': f'Failed to acknowledge incident: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
-        note = request.data.get('acknowledgment_note', '')
-        
-        with transaction.atomic():
-            incident.status = 'acknowledged'
-            incident.save()
-            
-            # Create comment
-            IncidentComment.objects.create(
-                incident=incident,
-                operator=operator,
-                comment=f"Incident acknowledged: {note}"
-            )
-            
-            # Create timeline event
-            IncidentTimelineEvent.objects.create(
-                incident=incident,
-                event_type='status_changed',
-                description=f"Incident acknowledged by {operator.name}",
-                operator=operator
-            )
-            
-        return Response({'status': 'incident acknowledged'})
 
     @action(detail=True, methods=['get'])
     def comments(self, request, pk=None):
@@ -474,6 +580,85 @@ class IncidentViewSet(viewsets.ModelViewSet):
                 {'detail': 'Invalid format specified'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    def create(self, request, *args, **kwargs):
+        try:
+            # Create the incident first
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            incident = serializer.save()
+
+            # Get the temperature from the alert's reading
+            alert = incident.alert
+            if alert and alert.reading:
+                temperature = alert.reading.temperature
+                severity = self._determine_severity(temperature)
+                
+                # Notify operators based on severity and escalation level
+                if severity >= 3:  # Severe - notify all operators
+                    self._notify_operators(incident, level=1)  # Primary
+                    self._notify_operators(incident, level=2)  # Secondary
+                    self._notify_operators(incident, level=3)  # Tertiary
+                elif severity == 2:  # Critical - notify primary and secondary
+                    self._notify_operators(incident, level=1)  # Primary
+                    self._notify_operators(incident, level=2)  # Secondary
+                else:  # Normal - notify only primary
+                    self._notify_operators(incident, level=1)  # Primary
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def _determine_severity(self, temperature):
+        settings = SystemSettings.get_settings()
+        
+        if temperature < 0 or temperature > 10:
+            return 3  # Severe - outside safe range
+        elif temperature < 2 or temperature > 8:
+            return 2  # Critical - outside normal range
+        else:
+            return 1  # Normal range
+
+    def _notify_operators(self, incident, level):
+        """Notify operators based on escalation level"""
+        operators = Operator.objects.filter(priority=level, is_active=True)
+        notification_service = NotificationService()
+        
+        for operator in operators:
+            try:
+                # Create notification
+                notification_service.notify_operator(
+                    operator=operator,
+                    incident=incident,
+                    message=self._get_notification_message(incident, level)
+                )
+                
+                # Log notification in timeline
+                IncidentTimelineEvent.objects.create(
+                    incident=incident,
+                    event_type='notification_sent',
+                    description=f"Notification sent to {operator.name} (Level {level})",
+                    operator=operator
+                )
+                
+            except Exception as e:
+                logger.error(f"Failed to notify operator {operator.id}: {str(e)}")
+
+    def _get_notification_message(self, incident, level):
+        temperature = incident.alert.reading.temperature if incident.alert and incident.alert.reading else None
+        severity_text = "SEVERE" if temperature and (temperature < 0 or temperature > 10) else \
+                       "CRITICAL" if temperature and (temperature < 2 or temperature > 8) else \
+                       "NORMAL"
+        
+        return f"""Temperature {severity_text} Alert
+Temperature: {temperature}°C
+Device: {incident.device.name}
+Location: {incident.device.location}
+Alert Count: {incident.alert_count}
+Escalation Level: {level}"""
 
 class DeviceViewSet(viewsets.ModelViewSet):
     queryset = Device.objects.all()
@@ -709,12 +894,11 @@ class ESPDataCollectionView(APIView):
             return 1  # Low severity for normal range (shouldn't typically occur)
 
 class TemperatureStatsView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
     def get(self, request):
         period = request.query_params.get('period', '24h')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        device_id = request.query_params.get('device_id')
         
         # Get current time as reference point instead of latest reading
         reference_time = timezone.now()
@@ -746,7 +930,13 @@ class TemperatureStatsView(APIView):
         readings = Reading.objects.filter(
             timestamp__gte=start_time,
             timestamp__lte=end_time
-        ).order_by('timestamp')  # Changed to ascending order
+        )
+
+        # Filter by device_id if provided
+        if device_id:
+            readings = readings.filter(device_id=device_id)
+
+        readings = readings.order_by('timestamp')  # Changed to ascending order
 
         if not readings.exists():
             return Response({

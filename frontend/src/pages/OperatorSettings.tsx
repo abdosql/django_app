@@ -3,42 +3,12 @@ import { User, Mail, Phone, Bell, Shield, Plus, UserPlus } from 'lucide-react';
 import FlashMessage from '../components/FlashMessage';
 import AddOperatorModal from '../components/AddOperatorModal';
 import EditOperatorModal from '../components/EditOperatorModal';
-
-interface Operator {
-  id: number;
-  name: string;
-  user_email: string;
-  telegram_id?: string;
-  is_active: boolean;
-  priority: number;
-  priority_display: string;
-  created_at: string;
-  updated_at: string;
-  notification_preferences?: {
-    email_enabled: boolean;
-    telegram_enabled: boolean;
-    phone_enabled: boolean;
-  };
-}
+import { apiService } from '../services/api.service';
+import { Operator, OperatorFormData, ApiOperatorResponse } from '../types/operator';
 
 interface FlashState {
   message: string;
   type: 'success' | 'error';
-}
-
-interface OperatorFormData {
-  name: string;
-  email: string;
-  password: string;
-  phone: string;
-  telegram_id?: string;
-  is_active: boolean;
-  priority: number;
-  notification_preferences: {
-    email_enabled: boolean;
-    telegram_enabled: boolean;
-    phone_enabled: boolean;
-  };
 }
 
 export default function OperatorSettings() {
@@ -52,40 +22,17 @@ export default function OperatorSettings() {
   useEffect(() => {
     const fetchOperators = async () => {
       try {
-        const token = sessionStorage.getItem('access_token');
-        console.log('Fetching operators with token:', token?.substring(0, 10) + '...');
+        const response = await apiService.request<ApiOperatorResponse>('/operators/');
         
-        const response = await fetch('/api/operators/', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        });
-
-        console.log('Response status:', response.status);
-        const contentType = response.headers.get('content-type');
-        console.log('Response content type:', contentType);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Error response:', errorText);
-          throw new Error('Failed to fetch operators');
+        if (response.error) {
+          throw new Error(response.error);
         }
 
-        const data = await response.json();
-        console.log('Raw operator data:', data);
-
-        // Check if data is an array
-        if (Array.isArray(data)) {
-          console.log('Individual operator data:', data[0]);
-          setOperators(data);
-        } else if (data.results && Array.isArray(data.results)) {
-          console.log('Individual operator data:', data.results[0]);
-          setOperators(data.results);
-        } else {
-          console.error('Unexpected data format:', data);
-          throw new Error('Invalid data format from server');
+        if (response.data) {
+          const operatorData = response.data.results || response.data;
+          if (Array.isArray(operatorData)) {
+            setOperators(operatorData);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch operators:', error);
@@ -129,36 +76,22 @@ export default function OperatorSettings() {
 
   const handleAddOperator = async (operatorData: OperatorFormData) => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch('/api/operators/', {
+      const response = await apiService.request<Operator>('/operators/', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: operatorData.name,
-          email: operatorData.email,
-          password: operatorData.password,
-          phone: operatorData.phone,
-          telegram_id: operatorData.telegram_id,
-          is_active: operatorData.is_active,
-          priority: operatorData.priority,
-          notification_preferences: operatorData.notification_preferences
-        }),
+        body: JSON.stringify(operatorData)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to add operator');
+      if (response.error) {
+        throw new Error(response.error);
       }
 
-      const newOperator = await response.json();
-      setOperators([...operators, newOperator]);
-      setFlash({
-        type: 'success',
-        message: 'Operator added successfully'
-      });
+      if (response.data) {
+        setOperators(prevOperators => [...prevOperators, response.data as Operator]);
+        setFlash({
+          type: 'success',
+          message: 'Operator added successfully'
+        });
+      }
     } catch (error) {
       console.error('Failed to add operator:', error);
       setFlash({
@@ -168,44 +101,26 @@ export default function OperatorSettings() {
     }
   };
 
-  const handleEditOperator = async (id: number, operatorData: OperatorFormData) => {
+  const handleEditOperator = async (id: number, operatorData: Partial<OperatorFormData>) => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      console.log('Updating operator with data:', operatorData);
-
-      const response = await fetch(`/api/operators/${id}/`, {
+      const response = await apiService.request<Operator>(`/operators/${id}/`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: operatorData.name,
-          email: operatorData.email,
-          telegram_id: operatorData.telegram_id,
-          is_active: operatorData.is_active,
-          priority: operatorData.priority,
-          notification_preferences: operatorData.notification_preferences
-        }),
+        body: JSON.stringify(operatorData)
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update operator');
+      if (response.error) {
+        throw new Error(response.error);
       }
 
-      const updatedOperator = await response.json();
-      console.log('Updated operator response:', updatedOperator);
-      
-      setOperators(operators.map(op => op.id === id ? {
-        ...updatedOperator,
-        user_email: operatorData.email
-      } : op));
-      
-      setFlash({
-        type: 'success',
-        message: 'Operator updated successfully'
-      });
+      if (response.data) {
+        setOperators(prevOperators => 
+          prevOperators.map(op => op.id === id ? response.data as Operator : op)
+        );
+        setFlash({
+          type: 'success',
+          message: 'Operator updated successfully'
+        });
+      }
     } catch (error) {
       console.error('Failed to update operator:', error);
       setFlash({
@@ -215,24 +130,17 @@ export default function OperatorSettings() {
     }
   };
 
-  // Test Notification
   const handleTestNotification = async (operatorId: number) => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(`/api/operators/${operatorId}/test_notification/`, {
+      const response = await apiService.request(`/operators/${operatorId}/test_notification/`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           message: 'Test notification from system'
-        }),
+        })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to send test notification');
+      if (response.error) {
+        throw new Error(response.error);
       }
 
       setFlash({
@@ -248,21 +156,14 @@ export default function OperatorSettings() {
     }
   };
 
-  // Reset Alerts
   const handleResetAlerts = async (operatorId: number) => {
     try {
-      const token = sessionStorage.getItem('access_token');
-      const response = await fetch(`/api/operators/${operatorId}/reset_alerts/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await apiService.request(`/operators/${operatorId}/reset_alerts/`, {
+        method: 'POST'
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to reset alerts');
+      if (response.error) {
+        throw new Error(response.error);
       }
 
       setFlash({

@@ -1,24 +1,25 @@
 import logging
-import requests
+from django.core.mail import send_mail
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 class EmailService:
-    def __init__(self):
-        self.api_url = 'http://atmosense.runasp.net/email'
-
     def send_email(self, operator, subject, message, alert=None, incident=None):
-        """Send email using the API endpoint"""
+        """Send email using Django's email functionality"""
         try:
-            # Format a simple message
+            # Format the message
             email_content = self._format_message(alert, incident, message, operator)
             
-            # For testing purposes, simulate successful email sending
-            # In production, uncomment the API call
-            # response = requests.post(self.api_url, json=payload)
-            # return response.status_code == 200
+            # Send email using Django's send_mail
+            send_mail(
+                subject=subject,
+                message=email_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[operator.user.email],
+                fail_silently=False,
+            )
             
-            # Simulate successful email sending
             return True
                 
         except Exception as e:

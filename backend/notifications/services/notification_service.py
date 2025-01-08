@@ -202,3 +202,56 @@ Time: {incident.start_time.strftime('%Y-%m-%d %H:%M:%S')}
 Operator: {operator.name}
 Priority: {operator.get_priority_display()}
         """ 
+
+    def send_test_notification(self, operator, message):
+        """
+        Send a test notification to a single operator
+        Args:
+            operator: The Operator model instance to notify
+            message: The message to send to the operator
+        Returns:
+            bool: True if notification was successful
+        """
+        try:
+            # Create notification record first
+            notification = Notification.objects.create(
+                operator=operator,
+                message=message,
+                notification_type='EMAIL',
+                status='PENDING'
+            )
+            
+            # Format test message
+            formatted_message = f"""
+🧪 *Test Notification*
+
+Message: {message}
+Time: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Operator: {operator.name}
+Priority: {operator.get_priority_display()}
+
+This is a test notification to verify your notification settings.
+            """
+            
+            # Send email
+            email_success = self.email_service.send_email(
+                operator=operator,
+                subject="Test Notification",
+                message=formatted_message
+            )
+            
+            if email_success:
+                notification.status = 'SENT'
+                notification.sent_at = timezone.now()
+                notification.save()
+                return True
+            else:
+                notification.status = 'FAILED'
+                notification.retry_count = 1
+                notification.save()
+                return False
+            
+        except Exception as e:
+            logger.error(f"Failed to send test notification to operator {operator.id}: {str(e)}")
+            return False 

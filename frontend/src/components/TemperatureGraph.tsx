@@ -35,7 +35,11 @@ interface TooltipProps {
   label?: string;
 }
 
-export default function TemperatureGraph() {
+interface TemperatureGraphProps {
+  deviceId?: string;
+}
+
+export default function TemperatureGraph({ deviceId }: TemperatureGraphProps) {
   const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d' | 'custom'>('24h');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -45,7 +49,8 @@ export default function TemperatureGraph() {
   const { readings, isLoading, error, refetch } = useHistoricalReadings(
     timeRange,
     timeRange === 'custom' ? customStartDate : undefined,
-    timeRange === 'custom' ? customEndDate : undefined
+    timeRange === 'custom' ? customEndDate : undefined,
+    deviceId
   );
   const { settings } = useSystemSettings();
 

@@ -49,6 +49,7 @@ class Notification(models.Model):
         ('FAILED', 'Failed'),
         ('DELIVERED', 'Delivered'),
         ('READ', 'Read'),
+        ('CANCELLED', 'Cancelled'),
     ]
 
     operator = models.ForeignKey('Operator', on_delete=models.CASCADE, related_name='notifications')

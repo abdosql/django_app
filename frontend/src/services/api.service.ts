@@ -35,29 +35,50 @@ interface SystemSettings {
   updated_at?: string;
 }
 
-class ApiService {
-  private baseUrl: string = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+interface CreateIncidentData {
+  device_id: string;
+  alert: number;
+  description: string;
+  status: string;
+  alert_count: number;
+  current_escalation_level: number;
+  start_time: string;
+}
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+class ApiService {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = 'http://localhost:8000/api';
+  }
+
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
-      const token = sessionStorage.getItem('access_token');
+      const token = authService.getAccessToken();
+      
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        ...(token && { 'Authorization': `Bearer ${token}` }),
         ...options.headers,
       };
+
+      console.log('Making request to:', `${this.baseUrl}${endpoint}`);
+      console.log('Request options:', {
+        ...options,
+        headers,
+        body: options.body ? JSON.parse(options.body as string) : undefined
+      });
 
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
+        credentials: 'include',
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          await authService.refreshToken();
-          return this.request(endpoint, options);
-        }
-        throw new Error(`API Error: ${response.statusText}`);
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(JSON.stringify(errorData));
       }
 
       const contentType = response.headers.get('content-type');
@@ -66,82 +87,57 @@ class ApiService {
         return { data };
       }
 
-      return { data: await response.blob() as any };
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        return { error: error.message };
-      }
-      return { error: 'An unknown error occurred' };
+      throw new Error('Invalid response format: expected JSON');
+    } catch (error) {
+      console.error('API request failed:', error);
+      return { 
+        error: error instanceof Error ? error.message : 'Unknown error occurred while making the request'
+      };
     }
   }
 
   // Temperature Readings
-  async getLatestReadings() {
-    return this.request<any[]>('/monitoring/readings/');
+  async getLatestReadings(deviceId?: string) {
+    const params = new URLSearchParams();
+    if (deviceId) {
+      params.append('device_id', deviceId);
+    }
+    console.log('Fetching latest readings for device:', deviceId);
+    return this.request<any[]>(`/monitoring/readings/?${params.toString()}`);
   }
 
-  async getTemperatureStats(period: '24h' | '7d' | '30d' | 'custom') {
-    return this.request<any>(`/monitoring/temperature/stats/?period=${period}`);
+  async getTemperatureStats(period: '24h' | '7d' | '30d' | 'custom', deviceId?: string) {
+    const params = new URLSearchParams({ period });
+    if (deviceId) {
+      params.append('device_id', deviceId);
+    }
+    console.log('Fetching temperature stats for device:', deviceId, 'period:', period);
+    return this.request<any>(`/monitoring/temperature/stats/?${params.toString()}`);
   }
 
-  async getCustomTemperatureStats(startDate: string, endDate: string) {
+  async getCustomTemperatureStats(startDate: string, endDate: string, deviceId?: string) {
     const params = new URLSearchParams({
       start_date: startDate,
       end_date: endDate
     });
+    if (deviceId) {
+      params.append('device_id', deviceId);
+    }
+    console.log('Fetching custom temperature stats for device:', deviceId, 'period:', startDate, 'to', endDate);
     return this.request<any>(`/monitoring/temperature/stats/?${params.toString()}`);
   }
 
-  public async exportReadings(format: 'csv', dateRange?: { start: string; end: string }) {
-    try {
-      const params = new URLSearchParams();
-      if (dateRange) {
-        params.append('start_date', dateRange.start);
-        params.append('end_date', dateRange.end);
-      }
-      
-      const response = await fetch(`${this.baseUrl}/monitoring/readings/export/?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${sessionStorage.getItem('access_token')}`,
-          'Accept': 'text/csv'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to export data';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorMessage;
-        } catch (e) {
-          // If error text is not JSON, use it directly
-          errorMessage = errorText || errorMessage;
-        }
-        console.error('Export error:', errorText);
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'temperature_readings.csv';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Export failed:', error);
-      return { error: error instanceof Error ? error.message : 'Failed to export data' };
-    }
-  }
-
   // Alerts
-  async getActiveAlerts(page: number = 1, limit: number = 10) {
-    return this.request<AlertsResponse>(`/monitoring/alerts/active/?page=${page}&limit=${limit}`);
+  async getActiveAlerts(page: number = 1, limit: number = 10, deviceId?: string) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    });
+    if (deviceId) {
+      params.append('device_id', deviceId);
+    }
+    console.log('Fetching active alerts for device:', deviceId, 'page:', page);
+    return this.request<AlertsResponse>(`/monitoring/alerts/active/?${params.toString()}`);
   }
 
   async acknowledgeAlert(alertId: number) {
@@ -159,26 +155,8 @@ class ApiService {
     return this.request<any>(`/monitoring/incidents/${id}/`);
   }
 
-  async acknowledgeIncident(id: number, data: { acknowledgment_note: string }) {
-    return this.request<any>(`/monitoring/incidents/${id}/acknowledge/`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
-  async createIncident(data: {
-    alert_id: number;
-    description: string;
-    device_id: string;
-  }) {
-    return this.request<any>('/monitoring/incidents/', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    });
-  }
-
   async addIncidentComment(incidentId: number, data: { 
-    comment: string; 
+    comment: string;
     action_taken?: boolean;
     is_read?: boolean;
   }) {
@@ -188,40 +166,27 @@ class ApiService {
     });
   }
 
-  async getIncidentComments(incidentId: number) {
-    return this.request<any[]>(`/monitoring/incidents/${incidentId}/comments/`);
-  }
-
-  async getIncidentTimeline(incidentId: number) {
-    return this.request<any[]>(`/monitoring/incidents/${incidentId}/timeline/`);
-  }
-
-  async generateIncidentReport(incidentId: number) {
-    return this.request<any>(`/monitoring/incidents/${incidentId}/report/`);
-  }
-
-  // Devices
-  async getDevices() {
-    return this.request<any[]>('/monitoring/devices/');
-  }
-
-  async registerDevice(data: {
-    device_id: string;
-    name: string;
-    location: string;
-    reading_interval: number;
-  }) {
-    return this.request<any>('/monitoring/devices/', {
+  async acknowledgeIncident(id: number, data: { acknowledgment_note: string }) {
+    return this.request<any>(`/monitoring/incidents/${id}/acknowledge/`, {
       method: 'POST',
       body: JSON.stringify(data)
     });
   }
 
-  async updateDeviceStatus(deviceId: string, status: 'online' | 'offline' | 'warning' | 'error') {
-    return this.request<any>(`/monitoring/devices/${deviceId}/status/`, {
-      method: 'PUT',
-      body: JSON.stringify({ status })
+  async createIncident(data: CreateIncidentData) {
+    console.log('Creating incident with data:', data);
+    return this.request<any>('/monitoring/incidents/', {
+      method: 'POST',
+      body: JSON.stringify(data)
     });
+  }
+
+  async getIncidentComments(id: number) {
+    return this.request<any[]>(`/monitoring/incidents/${id}/comments/`);
+  }
+
+  async getIncidentTimeline(id: number) {
+    return this.request<any[]>(`/monitoring/incidents/${id}/timeline/`);
   }
 
   // Notifications
@@ -235,27 +200,39 @@ class ApiService {
     });
   }
 
-  // Operators
-  async getOperators() {
-    return this.request<any[]>('/operators/');
+  async getUnreadCount() {
+    return this.request<{ count: number }>('/notifications/unread_count/');
   }
 
-  async updateOperator(operatorId: number, data: any) {
-    return this.request<any>(`/operators/${operatorId}/`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    });
+  async getNotificationsByStatus(status: 'PENDING' | 'SENT' | 'FAILED' | 'READ') {
+    return this.request<any[]>(`/notifications/by_status/?status=${status}`);
   }
 
-  // Settings
-  async getSettings() {
+  // System Settings
+  async getSettings(): Promise<ApiResponse<SystemSettings>> {
     return this.request<SystemSettings>('/settings/');
   }
 
-  async updateSettings(data: Partial<SystemSettings>) {
+  async updateSettings(settings: Partial<SystemSettings>): Promise<ApiResponse<SystemSettings>> {
     return this.request<SystemSettings>('/settings/', {
       method: 'PATCH',
-      body: JSON.stringify(data)
+      body: JSON.stringify(settings)
+    });
+  }
+
+  // Devices
+  async getDevices() {
+    return this.request<any[]>('/monitoring/devices/');
+  }
+
+  async getDeviceStatus(deviceId: string) {
+    return this.request<any>(`/monitoring/devices/${deviceId}/status/`);
+  }
+
+  async updateDeviceStatus(deviceId: string, status: string) {
+    return this.request<any>(`/monitoring/devices/${deviceId}/status/`, {
+      method: 'PUT',
+      body: JSON.stringify({ status })
     });
   }
 }

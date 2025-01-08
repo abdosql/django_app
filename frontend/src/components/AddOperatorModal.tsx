@@ -1,25 +1,11 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { OperatorFormData } from '../types/operator';
 
 interface AddOperatorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (operatorData: OperatorFormData) => Promise<void>;
-}
-
-interface OperatorFormData {
-  name: string;
-  email: string;
-  password: string;
-  phone: string;
-  telegram_id?: string;
-  is_active: boolean;
-  priority: number;
-  notification_preferences: {
-    email_enabled: boolean;
-    telegram_enabled: boolean;
-    phone_enabled: boolean;
-  };
 }
 
 export default function AddOperatorModal({ isOpen, onClose, onAdd }: AddOperatorModalProps) {

@@ -14,7 +14,12 @@ interface TemperatureStats {
   min_temperature: number;
 }
 
-export function useHistoricalReadings(timeRange: '24h' | '7d' | '30d' | 'custom', customStartDate?: string, customEndDate?: string) {
+export function useHistoricalReadings(
+  timeRange: '24h' | '7d' | '30d' | 'custom',
+  customStartDate?: string,
+  customEndDate?: string,
+  deviceId?: string
+) {
   const [readings, setReadings] = useState<Reading[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,9 +31,13 @@ export function useHistoricalReadings(timeRange: '24h' | '7d' | '30d' | 'custom'
       
       let response;
       if (timeRange === 'custom' && customStartDate && customEndDate) {
-        response = await apiService.getCustomTemperatureStats(customStartDate, customEndDate);
+        response = await apiService.getCustomTemperatureStats(
+          customStartDate,
+          customEndDate,
+          deviceId
+        );
       } else {
-        response = await apiService.getTemperatureStats(timeRange);
+        response = await apiService.getTemperatureStats(timeRange, deviceId);
       }
 
       if (response.error) {
@@ -53,7 +62,7 @@ export function useHistoricalReadings(timeRange: '24h' | '7d' | '30d' | 'custom'
     } finally {
       setIsLoading(false);
     }
-  }, [timeRange, customStartDate, customEndDate]);
+  }, [timeRange, customStartDate, customEndDate, deviceId]);
 
   useEffect(() => {
     fetchHistoricalData();

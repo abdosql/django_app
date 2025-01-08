@@ -29,7 +29,7 @@ class OperatorViewSet(viewsets.ModelViewSet):
         message = request.data.get('message', 'Test notification')
         
         notification_service = NotificationService()
-        success = notification_service.notify_operator(operator, message)
+        success = notification_service.send_test_notification(operator, message)
         
         if success:
             return Response({'status': 'notification sent'})
@@ -62,6 +62,18 @@ class OperatorViewSet(viewsets.ModelViewSet):
             {'status': 'broadcast partially failed'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         ) 
+
+    @action(detail=True, methods=['post'])
+    def reset_alerts(self, request, pk=None):
+        operator = self.get_object()
+        
+        # Reset all pending notifications for this operator
+        Notification.objects.filter(
+            operator=operator,
+            status='PENDING'
+        ).update(status='CANCELLED')
+        
+        return Response({'status': 'alerts reset successfully'})
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer

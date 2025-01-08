@@ -33,7 +33,11 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/profile" element={<MyProfile />} />
-                      <Route path="/operator-settings" element={<OperatorSettings />} />
+                      <Route path="/operator-settings" element={
+                        <AdminRoute>
+                          <OperatorSettings />
+                        </AdminRoute>
+                      } />
                       <Route path="/incidents/:id" element={<IncidentDetails />} />
                       <Route path="/incidents" element={<Incidents />} />
                       <Route path="/export" element={<ExportData />} />

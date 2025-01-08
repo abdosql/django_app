@@ -102,23 +102,23 @@ export default function NotificationsDropdown({ isOpen, onClose }: Notifications
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-4 ${getNotificationColor(notification.alert.type, notification.alert.severity)} ${
+                className={`p-4 ${getNotificationColor(notification.alert?.type || '', notification.alert?.severity || '')} ${
                   notification.status !== 'READ' ? 'bg-opacity-50' : ''
                 }`}
                 onClick={() => markAsRead(notification.id)}
               >
                 <div className="flex items-start">
-                  {getNotificationIcon(notification.alert.type)}
+                  {getNotificationIcon(notification.alert?.type || '')}
                   <div className="ml-3 flex-1">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-gray-900">
-                        {notification.alert.message}
+                        {notification.message || notification.alert?.message}
                       </p>
                       {notification.status === 'READ' && (
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       )}
                     </div>
-                    {notification.alert.temperature && (
+                    {notification.alert?.temperature && (
                       formatTemperature(notification.alert.temperature)
                     )}
                     <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
@@ -126,9 +126,24 @@ export default function NotificationsDropdown({ isOpen, onClose }: Notifications
                         <Clock className="h-3 w-3 mr-1" />
                         {formatDistanceToNow(parseISO(notification.created_at), { addSuffix: true })}
                       </div>
-                      {notification.alert.device && (
+                      {notification.alert?.device && (
                         <span className="text-gray-400">
                           {notification.alert.device.name}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs">
+                      <span className={`px-2 py-0.5 rounded-full ${
+                        notification.status === 'READ' ? 'bg-green-100 text-green-800' :
+                        notification.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                        notification.status === 'SENT' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {notification.status_display || notification.status}
+                      </span>
+                      {notification.operator && (
+                        <span className="text-gray-500">
+                          {notification.operator.name}
                         </span>
                       )}
                     </div>

@@ -1,41 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { Operator, OperatorFormData } from '../types/operator';
 
 interface EditOperatorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (id: number, operatorData: OperatorFormData) => Promise<void>;
+  onEdit: (id: number, operatorData: Partial<OperatorFormData>) => Promise<void>;
   operator: Operator | null;
-}
-
-interface OperatorFormData {
-  name: string;
-  email: string;
-  password?: string;
-  phone?: string;
-  telegram_id?: string;
-  is_active: boolean;
-  priority: number;
-  notification_preferences: {
-    email_enabled: boolean;
-    telegram_enabled: boolean;
-    phone_enabled: boolean;
-  };
-}
-
-interface Operator {
-  id: number;
-  name: string;
-  user_email: string;
-  telegram_id?: string;
-  is_active: boolean;
-  priority: number;
-  priority_display: string;
-  notification_preferences?: {
-    email_enabled: boolean;
-    telegram_enabled: boolean;
-    phone_enabled: boolean;
-  };
 }
 
 export default function EditOperatorModal({ isOpen, onClose, onEdit, operator }: EditOperatorModalProps) {
@@ -77,17 +48,22 @@ export default function EditOperatorModal({ isOpen, onClose, onEdit, operator }:
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const updateData = {
+      const updateData: Partial<OperatorFormData> = {
         name: formData.name,
-        email: formData.email,
+        email: formData.email !== operator.user_email ? formData.email : undefined,
         telegram_id: formData.telegram_id,
         is_active: formData.is_active,
         priority: formData.priority,
         notification_preferences: formData.notification_preferences,
       };
       
-      console.log('Sending update data:', updateData);
-      await onEdit(operator.id, updateData);
+      // Remove undefined fields
+      const cleanedData = Object.fromEntries(
+        Object.entries(updateData).filter(([_, v]) => v !== undefined)
+      ) as Partial<OperatorFormData>;
+      
+      console.log('Sending update data:', cleanedData);
+      await onEdit(operator.id, cleanedData);
       onClose();
     } finally {
       setIsSubmitting(false);

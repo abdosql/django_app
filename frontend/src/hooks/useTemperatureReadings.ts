@@ -14,7 +14,7 @@ interface WebSocketMessage {
   data: TemperatureReading;
 }
 
-export function useTemperatureReadings() {
+export function useTemperatureReadings(deviceId?: string) {
   const [currentReading, setCurrentReading] = useState<TemperatureReading | null>(null);
   const [maxTemp, setMaxTemp] = useState<number>(0);
   const [minTemp, setMinTemp] = useState<number>(0);
@@ -26,15 +26,18 @@ export function useTemperatureReadings() {
   // Function to fetch initial readings
   const fetchReadings = useCallback(async () => {
     try {
+      console.log('useTemperatureReadings: Fetching readings for device:', deviceId);
       setIsLoading(true);
       setError(null);
-      const response = await apiService.getLatestReadings();
+      const response = await apiService.getLatestReadings(deviceId);
       
       if (response.error) {
         throw new Error(response.error);
       }
       
       const readings = response.data as TemperatureReading[];
+      console.log('useTemperatureReadings: Received readings:', readings);
+      
       if (readings && readings.length > 0) {
         const latestReading = readings[0];
         const previousReading = readings[1];
@@ -64,26 +67,49 @@ export function useTemperatureReadings() {
             setTrend(diff > 0 ? 'up' : 'down');
           }
         }
+      } else {
+        // Reset state when no readings are available
+        setCurrentReading(null);
+        setMaxTemp(0);
+        setMinTemp(0);
+        setTrend('stable');
       }
     } catch (err) {
+      console.error('Error fetching readings:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while fetching readings');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [deviceId]);
+
+  // Reset state when device changes
+  useEffect(() => {
+    console.log('useTemperatureReadings: Device changed to:', deviceId);
+    setCurrentReading(null);
+    setMaxTemp(0);
+    setMinTemp(0);
+    setTrend('stable');
+    fetchReadings();
+  }, [deviceId, fetchReadings]);
 
   // WebSocket connection setup
   useEffect(() => {
+    if (!deviceId) {
+      console.log('useTemperatureReadings: No device selected, skipping WebSocket connection');
+      return;
+    }
+
     const token = sessionStorage.getItem('access_token');
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/readings/`;
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws/readings/${deviceId}`;
     
+    console.log('useTemperatureReadings: Connecting to WebSocket:', wsUrl);
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
       // Authenticate WebSocket connection
       ws.send(JSON.stringify({ token }));
-      console.log('WebSocket connected');
+      console.log('WebSocket connected for device:', deviceId);
     };
 
     ws.onmessage = (event) => {
@@ -92,6 +118,7 @@ export function useTemperatureReadings() {
         
         if (message.type === 'reading_update') {
           const newReading = message.data;
+          console.log('useTemperatureReadings: Received new reading:', newReading);
           
           setCurrentReading(prevReading => {
             if (!prevReading) return newReading;
@@ -118,12 +145,12 @@ export function useTemperatureReadings() {
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('WebSocket error for device:', deviceId, error);
       setError('WebSocket connection error');
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
+      console.log('WebSocket disconnected for device:', deviceId);
       // Attempt to reconnect after a delay
       setTimeout(() => {
         setSocket(null);  // This will trigger a reconnection
@@ -132,25 +159,24 @@ export function useTemperatureReadings() {
 
     setSocket(ws);
 
-    // Initial fetch
-    fetchReadings();
-
     // Cleanup
     return () => {
       if (ws.readyState === WebSocket.OPEN) {
+        console.log('useTemperatureReadings: Closing WebSocket for device:', deviceId);
         ws.close();
       }
     };
-  }, [fetchReadings]);
+  }, [deviceId]);
 
   // Fallback polling mechanism
   useEffect(() => {
     // Only use polling if WebSocket is not connected
     if (socket?.readyState !== WebSocket.OPEN) {
+      console.log('useTemperatureReadings: Starting polling for device:', deviceId);
       const interval = setInterval(fetchReadings, 20000);
       return () => clearInterval(interval);
     }
-  }, [socket, fetchReadings]);
+  }, [socket, fetchReadings, deviceId]);
 
   return {
     currentTemperature: currentReading?.temperature ?? 0,

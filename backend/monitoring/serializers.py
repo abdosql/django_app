@@ -125,15 +125,17 @@ class IncidentSerializer(serializers.ModelSerializer):
     notifications = NotificationSerializer(many=True, read_only=True)
     timeline_events = IncidentTimelineEventSerializer(many=True, read_only=True)
     can_acknowledge = serializers.SerializerMethodField()
+    device_id = serializers.CharField(write_only=True)
     
     class Meta:
         model = Incident
         fields = [
-            'id', 'device', 'device_name', 'device_location', 'alert', 
+            'id', 'device', 'device_id', 'device_name', 'device_location', 'alert', 
             'description', 'status', 'status_display', 'current_escalation_level',
             'alert_count', 'start_time', 'end_time', 'assigned_to', 'resolved_by',
             'notifications', 'timeline_events', 'can_acknowledge'
         ]
+        read_only_fields = ['device']
 
     def get_can_acknowledge(self, obj):
         request = self.context.get('request')
@@ -145,3 +147,12 @@ class IncidentSerializer(serializers.ModelSerializer):
             return obj.status == 'open' and operator.is_active
         except:
             return False
+
+    def create(self, validated_data):
+        device_id = validated_data.pop('device_id')
+        try:
+            device = Device.objects.get(device_id=device_id)
+            validated_data['device'] = device
+            return super().create(validated_data)
+        except Device.DoesNotExist:
+            raise serializers.ValidationError({'device_id': f'Device with id {device_id} does not exist'})

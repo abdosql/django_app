@@ -26,8 +26,13 @@ export interface Notification {
   id: number;
   operator: Operator;
   alert: Alert;
+  notification_type: string;
+  notification_type_display: string;
   status: 'PENDING' | 'SENT' | 'FAILED' | 'READ';
+  status_display: string;
+  message: string;
   sent_at: string;
+  delivered_at: string | null;
   read_at: string | null;
   retry_count: number;
   created_at: string;
@@ -47,7 +52,13 @@ export function useNotifications() {
         throw new Error(response.error);
       }
       setNotifications(response.data || []);
-      setUnreadCount((response.data || []).filter(n => n.status === 'PENDING').length);
+      
+      // Get unread count
+      const countResponse = await apiService.getUnreadCount();
+      if (countResponse.error) {
+        throw new Error(countResponse.error);
+      }
+      setUnreadCount(countResponse.data?.count || 0);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch notifications';
       console.error('Error fetching notifications:', errorMessage);
@@ -63,6 +74,7 @@ export function useNotifications() {
       if (response.error) {
         throw new Error(response.error);
       }
+      
       // Update local state
       setNotifications(prev => prev.map(n => 
         n.id === notificationId ? { ...n, status: 'READ' as const } : n
